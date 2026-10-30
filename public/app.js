@@ -5,12 +5,14 @@ const $ = (id) => document.getElementById(id);
 const S = {
   caso: null, modo: 'practica', iaOK: false, forzarSim: false,
   i: 0, hist: [], repregunto: false, resultados: {}, t0: 0,
-  senales: { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, iaCaida: false },
+  senales: { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, captura: 0, iaCaida: false },
 };
 
 /* ---------- utilidades ---------- */
 function mostrar(id) {
   document.querySelectorAll('.pantalla').forEach((p) => p.classList.toggle('on', p.id === id));
+  document.body.classList.toggle('protegido', id === 'defensa');
+  document.body.classList.remove('velado');
   window.scrollTo(0, 0);
 }
 function norm(t) {
@@ -166,7 +168,8 @@ function empezar() {
   $('nombre-err').textContent = '';
   S.modo = document.querySelector('input[name=modo]:checked').value;
   S.i = 0; S.resultados = {}; S.t0 = Date.now();
-  S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, iaCaida: false };
+  S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, captura: 0, iaCaida: false };
+  $('marca-agua').textContent = `${S.nombre} · ${S.tarea.codigo}   `.repeat(120);
   $('d-modo').textContent = S.modo === 'practica' ? 'práctica' : 'evaluación';
   $('d-titulo').textContent = S.caso.documento.titulo;
   $('b-sim').classList.toggle('oculto', S.iaOK && !S.forzarSim && S.modo === 'evaluacion');
@@ -305,6 +308,7 @@ function reporte() {
   if (S.senales.leyo) sen.push(`${S.senales.leyo} respuesta(s) casi idénticas al texto del trabajo.`);
   if (S.senales.pantallaOculta) sen.push(`Salió de la pestaña ${S.senales.pantallaOculta} vez/veces.`);
   if (S.senales.pegadoBloqueado) sen.push(`Intentó pegar texto ${S.senales.pegadoBloqueado} vez/veces.`);
+  if (S.senales.captura) sen.push(`Intentó capturar o imprimir la pantalla ${S.senales.captura} vez/veces.`);
   if (S.senales.iaCaida) sen.push('La IA falló durante la sesión; parte se evaluó en modo simulado.');
   $('r-senales').innerHTML = '<h2>Señales de la sesión</h2>';
   const ps2 = document.createElement('p'); ps2.className = 'suave';
@@ -356,6 +360,35 @@ $('resp').addEventListener('paste', (e) => {
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && $('defensa').classList.contains('on')) S.senales.pantallaOculta++;
 });
+/* ---------- protección contra capturas (disuasión: el navegador no puede impedirlas del todo) ---------- */
+const enDefensa = () => $('defensa').classList.contains('on');
+function intentoCaptura() {
+  S.senales.captura++;
+  document.body.classList.add('velado');
+  setTimeout(() => { if (document.hasFocus()) document.body.classList.remove('velado'); }, 1500);
+  $('d-aviso').textContent = 'Durante la defensa no se permiten capturas. Queda registrado en las señales.';
+}
+document.addEventListener('keydown', (e) => {
+  if (!enDefensa()) return;
+  const k = e.key.toLowerCase();
+  const recorte = (e.metaKey || e.ctrlKey) && e.shiftKey && ['s', '3', '4', '5'].includes(k);
+  const imprimir = (e.metaKey || e.ctrlKey) && (k === 'p' || k === 's');
+  if (recorte || imprimir || k === 'printscreen') { e.preventDefault(); intentoCaptura(); }
+});
+// PrintScreen solo llega al soltar la tecla en varios navegadores; se intenta vaciar el portapapeles.
+document.addEventListener('keyup', (e) => {
+  if (!enDefensa() || e.key !== 'PrintScreen') return;
+  intentoCaptura();
+  if (navigator.clipboard) navigator.clipboard.writeText('').catch(() => {});
+});
+window.addEventListener('beforeprint', () => { if (enDefensa()) S.senales.captura++; });
+// Las herramientas de recorte quitan el foco a la ventana: se vela el contenido mientras tanto.
+window.addEventListener('blur', () => { if (enDefensa()) document.body.classList.add('velado'); });
+window.addEventListener('focus', () => { document.body.classList.remove('velado'); });
+['copy', 'cut', 'contextmenu', 'dragstart'].forEach((ev) => {
+  document.addEventListener(ev, (e) => { if (enDefensa() && e.target.id !== 'resp') e.preventDefault(); });
+});
+
 setInterval(() => {
   if (!$('defensa').classList.contains('on')) return;
   const s = Math.floor((Date.now() - S.t0) / 1000);
