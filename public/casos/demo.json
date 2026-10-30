@@ -1,0 +1,77 @@
+{
+  "id": "demo-patrones",
+  "provisional": true,
+  "curso": "Diseño de Software",
+  "tarea": "Informe de diseño: módulo de notificaciones",
+  "estudiante": "Lucía Mendoza",
+  "carlos": {
+    "nombre": "Carlos",
+    "perfil": "Compañero de segundo ciclo. Sabe programar en Java, pero nunca ha usado patrones de diseño. Es curioso y a veces se equivoca con mucha seguridad."
+  },
+  "documento": {
+    "titulo": "ReservaLab: diseño del módulo de notificaciones",
+    "fragmentos": [
+      { "id": "f1", "seccion": "1. Contexto", "texto": "ReservaLab permite a los estudiantes reservar laboratorios. Cuando una reserva se crea, se cancela o cambia de horario, varias partes del sistema deben enterarse: el correo al estudiante, el aviso al encargado del laboratorio y el registro de auditoría." },
+      { "id": "f2", "seccion": "2. Decisión: patrón Observer", "texto": "Usamos el patrón Observer. La clase Reserva actúa como sujeto y mantiene una lista de observadores que implementan la interfaz ObservadorReserva, con el método notificar(evento)." },
+      { "id": "f3", "seccion": "2. Decisión: patrón Observer", "texto": "Cada servicio interesado (NotificadorCorreo, AvisoEncargado, Auditoria) se registra con suscribir(). Cuando la reserva cambia, Reserva recorre la lista y llama a notificar() en cada observador." },
+      { "id": "f4", "seccion": "2. Decisión: patrón Observer", "texto": "Con esto, Reserva no depende de las clases concretas de los servicios, solo de la interfaz ObservadorReserva." },
+      { "id": "f5", "seccion": "3. Canales de envío: patrón Strategy", "texto": "El NotificadorCorreo delega el envío en una EstrategiaEnvio. Hoy existen EnvioSMTP y EnvioSimulado (para pruebas). La estrategia se inyecta al crear el notificador." },
+      { "id": "f6", "seccion": "4. Alternativas descartadas", "texto": "Descartamos llamar directamente a cada servicio desde Reserva porque cada nuevo aviso obligaría a modificar esa clase, lo que va contra el principio abierto/cerrado." },
+      { "id": "f7", "seccion": "5. Riesgos", "texto": "Si un observador falla, no debe impedir que los demás reciban el evento. Cada llamada a notificar() se envuelve en su propio manejo de errores." }
+    ]
+  },
+  "puntos": [
+    {
+      "id": "p1",
+      "tema": "Por qué Observer",
+      "fragmento": "f6",
+      "apertura": "Oye, una duda. ¿Por qué tanto lío con observadores? ¿No era más fácil que Reserva llame directo a EmailService y listo?",
+      "error_de_carlos": null,
+      "que_debe_explicar": "Que llamar directo acopla Reserva a cada servicio y obliga a modificarla por cada aviso nuevo (abierto/cerrado); Observer permite agregar avisos sin tocar Reserva.",
+      "simulado": {
+        "respuesta": "Porque si Reserva llama directo a cada servicio, cada vez que agregues un aviso nuevo tienes que abrir y cambiar Reserva. Con Observer solo creas otro observador y lo suscribes.",
+        "nivel": "verde",
+        "motivo": "Explicó el acoplamiento y el principio abierto/cerrado con sus palabras."
+      }
+    },
+    {
+      "id": "p2",
+      "tema": "Acoplamiento del sujeto",
+      "fragmento": "f4",
+      "apertura": "Ah, ya. Entonces Reserva tiene que conocer a NotificadorCorreo, AvisoEncargado y Auditoria para poder llamarlos, ¿no?",
+      "error_de_carlos": "Cree que el sujeto conoce las clases concretas de los observadores.",
+      "que_debe_explicar": "Que Reserva solo conoce la interfaz ObservadorReserva; no sabe qué clases concretas están suscritas.",
+      "simulado": {
+        "respuesta": "No, Reserva solo conoce la interfaz ObservadorReserva. Recorre una lista de esa interfaz y llama a notificar, no sabe si detrás hay un correo o una auditoría.",
+        "nivel": "verde",
+        "motivo": "Corrigió el error de Carlos y explicó la dependencia de la interfaz."
+      }
+    },
+    {
+      "id": "p3",
+      "tema": "Observer vs. Strategy",
+      "fragmento": "f5",
+      "apertura": "Ya veo. Y lo de Strategy en el correo es lo mismo que Observer, ¿no? Los dos usan una interfaz.",
+      "error_de_carlos": "Confunde Strategy con Observer porque ambos usan interfaces.",
+      "que_debe_explicar": "Que Observer resuelve 'avisar a muchos interesados cuando algo cambia' y Strategy resuelve 'elegir cómo hacer una tarea intercambiando el algoritmo'; usar interfaces no los hace iguales.",
+      "simulado": {
+        "respuesta": "Mmm, se parecen porque los dos usan interfaz... Strategy es para cambiar cómo se envía, creo, pero no sé bien explicar la diferencia.",
+        "nivel": "amarillo",
+        "motivo": "Intuye el propósito de Strategy pero no lo distingue con claridad de Observer."
+      }
+    },
+    {
+      "id": "p4",
+      "tema": "Cambio de condición: nuevo canal",
+      "fragmento": "f3",
+      "apertura": "Oye, y si mañana el profe pide avisar también por WhatsApp, ¿igual hay que meterle mano a la clase Reserva?",
+      "error_de_carlos": "Supone que agregar un canal obliga a modificar Reserva.",
+      "que_debe_explicar": "Que no: se agrega un nuevo observador (o una nueva estrategia de envío) y se suscribe, sin modificar Reserva.",
+      "simulado": {
+        "respuesta": "No, Reserva no se toca. Creas un NotificadorWhatsApp que implemente ObservadorReserva y lo suscribes. O si es dentro del correo, otra estrategia de envío.",
+        "nivel": "verde",
+        "motivo": "Aplicó el diseño a un caso nuevo y mencionó las dos vías posibles."
+      }
+    }
+  ]
+}

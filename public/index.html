@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defiéndelo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<!-- ============ ENTRADA (rol) ============ -->
+<section class="pantalla" id="rol">
+  <header class="top">
+    <span class="marca">defiéndelo<span class="cur">_</span></span>
+    <span class="mono suave estado-ia">comprobando IA…</span>
+  </header>
+  <main class="inicio">
+    <div class="hero">
+      <h1>No te vamos a examinar.<br>Vas a enseñarle tu trabajo a Carlos.</h1>
+      <p class="lead">Carlos es un compañero que no entiende tu trabajo y a veces se equivoca con mucha seguridad. Si puedes explicárselo y corregirlo, lo entiendes.</p>
+    </div>
+    <div class="inicio-form">
+      <form class="tarjeta pila" id="f-codigo">
+        <label class="etq" for="codigo">Soy estudiante</label>
+        <p class="suave chico">Ingresa el código que te dio tu profesor.</p>
+        <input id="codigo" class="codigo" type="text" autocomplete="off" spellcheck="false" placeholder="ABC-123" maxlength="12" required>
+        <p class="error" id="codigo-err" role="alert"></p>
+        <button class="btn" type="submit">Entrar</button>
+      </form>
+      <div class="tarjeta pila">
+        <p class="etq">Soy profesor</p>
+        <p class="suave chico">Crea una defensa y comparte el código con tu clase.</p>
+        <button class="btn claro" type="button" id="b-ir-profe">Crear tarea</button>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ============ PROFESOR: CREAR TAREA ============ -->
+<section class="pantalla" id="profe">
+  <header class="top">
+    <button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button>
+    <span class="mono suave">profesor</span>
+  </header>
+  <main class="solo">
+    <h1 class="titulo">Nueva defensa</h1>
+    <form class="tarjeta pila" id="f-tarea">
+      <div class="dos-col">
+        <div class="pila-c"><label class="etq" for="t-curso">Curso</label><input id="t-curso" type="text" value="Diseño de Software" required maxlength="80"></div>
+        <div class="pila-c"><label class="etq" for="t-prof">Profesor</label><input id="t-prof" type="text" placeholder="Tu nombre" maxlength="80"></div>
+      </div>
+      <div class="pila-c"><label class="etq" for="t-titulo">Título de la tarea</label><input id="t-titulo" type="text" value="Informe de diseño: módulo de notificaciones" required maxlength="120"></div>
+      <div class="pila-c"><label class="etq" for="t-crit">Qué deben poder explicar</label>
+        <textarea id="t-crit" class="claro" rows="3" maxlength="600">Por qué se eligió Observer, cómo reduce el acoplamiento, en qué se diferencia de Strategy y cómo se extiende el diseño.</textarea></div>
+      <div class="dos-col">
+        <div class="pila-c"><label class="etq" for="t-caso">Trabajo base</label><select id="t-caso"></select>
+          <span class="chico suave">En esta versión, el trabajo viene de un caso preparado.</span></div>
+        <div class="pila-c"><label class="etq" for="t-cierre">Cierre</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
+      </div>
+      <p class="error" id="tarea-err" role="alert"></p>
+      <button class="btn" type="submit" id="b-crear">Generar código</button>
+    </form>
+
+    <div class="tarjeta oscura pila oculto" id="creada" aria-live="polite">
+      <p class="mono chico" style="color:var(--osc-suave)">comparte este código con tus estudiantes</p>
+      <p class="codigo-grande" id="c-codigo"></p>
+      <p class="chico" id="c-aviso" style="color:var(--osc-suave)"></p>
+      <div class="fila">
+        <button class="btn amarillo" type="button" id="b-copiar">Copiar código</button>
+        <button class="btn claro" type="button" id="b-copiar-link">Copiar enlace</button>
+        <button class="btn fantasma" type="button" id="b-probar">Probar como estudiante</button>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ============ ESTUDIANTE: TAREA ============ -->
+<section class="pantalla" id="inicio">
+  <header class="top">
+    <button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button>
+    <span class="mono suave estado-ia">comprobando IA…</span>
+  </header>
+  <main class="inicio">
+    <div class="hero">
+      <p class="mono suave" id="i-curso"></p>
+      <h1 id="i-titulo"></h1>
+      <div id="i-crit-caja" class="oculto"><p class="etq">Lo que tu profesor espera que puedas explicar</p><p class="lead" id="i-crit"></p></div>
+    </div>
+    <div class="tarjeta inicio-form">
+      <div class="fila entre"><p class="etq" style="margin:0">Trabajo</p><span class="mono chico suave">código <b id="i-codigo"></b></span></div>
+      <div class="archivo"><span id="i-tarea"></span><span class="chip ok">listo</span></div>
+      <p class="mono chico suave" id="i-prov"></p>
+      <div class="pila-c"><label class="etq" for="nombre" style="margin:0">Tu nombre</label><input id="nombre" type="text" autocomplete="name" maxlength="80"><p class="error" id="nombre-err" role="alert"></p></div>
+
+      <fieldset>
+        <legend class="etq">Modo</legend>
+        <label class="opcion"><input type="radio" name="modo" value="practica" checked>
+          <span><b>Práctica</b><br><span class="suave">Solo tú ves el resultado. Puedes repetir las veces que quieras.</span></span></label>
+        <label class="opcion"><input type="radio" name="modo" value="evaluacion">
+          <span><b>Evaluación</b><br><span class="suave">El reporte lo ve tu profesor. Pegar texto está desactivado.</span></span></label>
+      </fieldset>
+
+      <p class="chico suave">Puedes haber usado IA para hacer tu trabajo; aquí importa que lo entiendas. Tu trabajo estará a la vista todo el tiempo.</p>
+      <button class="btn" id="b-empezar" type="button">Empezar con Carlos</button>
+    </div>
+  </main>
+</section>
+
+<!-- ============ DEFENSA ============ -->
+<section class="pantalla" id="defensa">
+  <header class="top">
+    <span class="marca">defiéndelo<span class="cur">_</span></span>
+    <ol class="progreso" id="progreso" aria-label="Puntos"></ol>
+    <span class="mono suave"><span id="d-modo"></span> · <span id="reloj">00:00</span></span>
+  </header>
+  <main class="defensa">
+    <article class="doc tarjeta" aria-label="Tu trabajo">
+      <p class="mono chico suave">tu trabajo</p>
+      <h2 id="d-titulo"></h2>
+      <div id="d-doc"></div>
+    </article>
+    <section class="carlos" aria-live="polite">
+      <div class="quien"><span class="av">C</span><span><b>Carlos</b> · <span id="d-punto"></span></span></div>
+      <p class="dice" id="d-dice"></p>
+      <div class="entrada">
+        <label for="resp" class="etq-osc">Tu explicación</label>
+        <textarea id="resp" rows="5" placeholder="Habla o escribe con tus palabras…"></textarea>
+        <p class="mono chico osc-suave" id="d-aviso"></p>
+        <div class="fila">
+          <button class="btn claro" id="b-mic" type="button">● Hablar</button>
+          <button class="btn amarillo" id="b-enviar" type="button">Responder</button>
+          <button class="btn fantasma" id="b-nose" type="button">No sé</button>
+          <button class="btn fantasma" id="b-sim" type="button">Simular respuesta</button>
+        </div>
+        <button class="btn amarillo oculto" id="b-sig" type="button">Siguiente</button>
+      </div>
+      <label class="voz mono chico"><input type="checkbox" id="c-voz" checked> voz de Carlos</label>
+    </section>
+  </main>
+</section>
+
+<!-- ============ REPORTE ============ -->
+<section class="pantalla" id="reporte">
+  <header class="top">
+    <span class="marca">defiéndelo<span class="cur">_</span></span>
+    <span class="mono suave" id="r-meta"></span>
+  </header>
+  <main class="reporte">
+    <div class="r-cab">
+      <div>
+        <p class="mono suave" id="r-modo"></p>
+        <h1 id="r-titulo"></h1>
+        <p class="suave" id="r-nota"></p>
+      </div>
+      <span class="chip grande" id="r-nivel"></span>
+    </div>
+    <div class="r-cuerpo">
+      <article class="doc tarjeta" aria-label="Trabajo marcado">
+        <p class="mono chico suave">tu trabajo, marcado según lo que explicaste</p>
+        <div class="leyenda mono chico"><span class="ley verde">explicado</span><span class="ley amarillo">a medias</span><span class="ley rojo">no explicado</span><span class="ley neutro">no se tocó</span></div>
+        <div id="r-doc"></div>
+      </article>
+      <aside class="r-lado">
+        <section class="tarjeta" id="r-puntos"></section>
+        <section class="tarjeta" id="r-senales"></section>
+        <section class="tarjeta oscura" id="r-siguiente"></section>
+      </aside>
+    </div>
+  </main>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>

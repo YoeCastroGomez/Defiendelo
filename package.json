@@ -1,0 +1,11 @@
+{
+  "name": "defiendelo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Defensa oral de trabajos: el estudiante le enseña su trabajo a Carlos, un compañero IA que se equivoca.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" }
+}
