@@ -28,6 +28,7 @@ export default async function handler(req, res) {
       tarea: limpio(b.tarea, 120),
       criterios: limpio(b.criterios, 600),
       estudiante: limpio(b.estudiante, 80),
+      evitar: Array.isArray(b.evitar) ? b.evitar.slice(0, 8).map((x) => limpio(x, 300)) : [],
       universidadId: 'demo',
     };
 

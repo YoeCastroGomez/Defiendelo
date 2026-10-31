@@ -111,9 +111,14 @@
           duracionSegundos,
           resultados: S.resultados,
           senales: S.senales,
+          intento: String(S.t0),
         }),
       });
       const d = await res.json();
+      if (res.status === 409) {
+        if (nodoEstado) nodoEstado.textContent = d.error;
+        return;
+      }
       if (!res.ok) throw new Error(d.error || 'No se pudo registrar la sesión');
 
       sesionEnviadaT0 = S.t0;
@@ -252,7 +257,7 @@
       const vacio = document.createElement('div');
       vacio.style.padding = '24px 20px';
       vacio.className = 'suave';
-      vacio.textContent = 'Aún no hay defensas completadas en modo evaluación para este código.';
+      vacio.textContent = 'Aún no hay entregas para este código.';
       lista.appendChild(vacio);
       $('p-detalle').classList.add('oculto');
       return;

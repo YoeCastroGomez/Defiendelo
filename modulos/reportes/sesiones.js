@@ -11,6 +11,8 @@ function errorHttp(mensaje, status = 400) {
 }
 
 const limpio = (v, max) => String(v || '').trim().slice(0, max);
+const claveNombre = (v) => limpio(v, 80).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ');
+const CODIGO_DEMO = 'DEMO-01'; // se puede repetir: lo usan el jurado y quienes prueban la app
 const enteroSenal = (v) => Math.max(0, Math.min(999, Math.floor(Number(v) || 0)));
 
 export function calcularNivelGeneral(resultadosObj) {
@@ -71,6 +73,18 @@ function sanitizarSenales(raw) {
   };
 }
 
+async function entregaPrevia(tarea, nombre) {
+  if (tarea.codigo === CODIGO_DEMO) return null;
+  const clave = claveNombre(nombre);
+  return (await listar('sesiones:' + tarea.codigo)).find((s) => claveNombre(s.nombre) === clave) || null;
+}
+
+export async function yaEntrego(codigoRaw, nombreRaw) {
+  const tarea = await obtenerTareaInterna(codigoRaw);
+  if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
+  return !!(await entregaPrevia(tarea, nombreRaw));
+}
+
 export async function guardarSesion(datos = {}) {
   if (datos.modo !== 'evaluacion') {
     throw errorHttp('Solo se guardan reportes en modo evaluación', 400);
@@ -80,6 +94,14 @@ export async function guardarSesion(datos = {}) {
 
   const tarea = await obtenerTareaInterna(datos.codigo);
   if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
+
+  // Un reintento del mismo intento (se perdió la respuesta) no es una segunda entrega.
+  const intento = limpio(datos.intento, 20);
+  const previa = await entregaPrevia(tarea, nombre);
+  if (previa) {
+    if (intento && previa.intento === intento) return { id: previa.id, nivelGeneral: previa.nivelGeneral };
+    throw errorHttp('Ya entregaste esta tarea con ese nombre. Solo se permite un intento.', 409);
+  }
 
   const resultados = sanitizarResultados(datos.resultados);
   const senales = sanitizarSenales(datos.senales);
@@ -100,6 +122,7 @@ export async function guardarSesion(datos = {}) {
     nombre,
     modo: 'evaluacion',
     nivelGeneral,
+    intento,
     duracionSegundos,
     resultados,
     senales,

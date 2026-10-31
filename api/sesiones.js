@@ -1,6 +1,7 @@
 // POST /api/sesiones          → guarda el reporte en modo evaluación y recalcula nivelGeneral
 // GET  /api/sesiones?codigo=X → devuelve las sesiones de la tarea validando cabecera x-token-profesor
-import { guardarSesion, consultarSesiones } from '../modulos/reportes/sesiones.js';
+// GET  /api/sesiones?codigo=X&nombre=Y → indica si ese estudiante ya entregó
+import { guardarSesion, consultarSesiones, yaEntrego } from '../modulos/reportes/sesiones.js';
 
 export default async function handler(req, res) {
   try {
@@ -10,6 +11,7 @@ export default async function handler(req, res) {
       return res.status(201).json(guardada);
     }
     if (req.method === 'GET') {
+      if (req.query?.nombre) return res.status(200).json({ entregada: await yaEntrego(req.query.codigo, req.query.nombre) });
       const h = req.headers?.['x-token-profesor'];
       const token = Array.isArray(h) ? h[0] : String(h || '');
       const datos = await consultarSesiones(req.query?.codigo, token);
