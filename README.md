@@ -9,7 +9,7 @@ Proyecto para **DSC HACK 2026** · Reto *Educación 2036* · Grieta 02 *“Apren
 
 ---
 
-## 🎯 Problema y solución
+## Problema y solución
 
 ### El problema
 Con la IA generativa, un estudiante puede entregar un trabajo impecable sin entenderlo. El trabajo entregado deja de ser evidencia de aprendizaje, y el profesor no tiene una forma escalable de comprobarlo:
@@ -81,7 +81,7 @@ Las señales (salidas de la pestaña, intentos de pegar, lectura literal y mulet
 
 ---
 
-## ⚙️ Arquitectura y tecnologías
+## Arquitectura y tecnologías
 
 Monolito modular de 3 capas. Las dependencias van en una sola dirección: `api/` → `modulos/` → `compartido/`.
 
@@ -189,7 +189,7 @@ vercel.json           Incluye los casos en las funciones y fija maxDuration
 
 ---
 
-## 🔗 Demo desplegada
+## Demo desplegada
 
 https://defiendelo-six.vercel.app
 
@@ -204,7 +204,7 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 
 ---
 
-## ✅ Funcionalidades implementadas
+## Funcionalidades implementadas
 
 - El profesor crea una tarea y obtiene un código, un enlace para compartir y un token privado.
 - Tareas con entrega individual o con un trabajo base común.
@@ -247,7 +247,7 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 
 ---
 
-## 📖 Instrucciones de ejecución
+## Instrucciones de ejecución
 
 Requisitos: **Node.js 18 o superior**. No hay dependencias que instalar.
 
@@ -328,14 +328,14 @@ Crea `modulos/casos/datos/<id>.json` con la misma estructura de `demo.json` (fra
 
 ---
 
-## 💼 Modelo de negocio (resumen)
+## Modelo de negocio (resumen)
 - **Quién paga:** la universidad, con una licencia por estudiante activo por semestre. El estudiante lo usa gratis.
 - **Cómo se entra:** gratis para profesores individuales hasta cierto número de defensas; la licencia se vende cuando varios profesores de una facultad ya lo usan.
 - **Costo:** una llamada a la IA por turno y voz procesada en el navegador, del orden de centavos de dólar por defensa.
 - **Ingreso secundario:** práctica de sustentación de tesis pagada por el estudiante.
 - **Estructura de precios proyectada:** USD 3 por estudiante activo al semestre en universidades privadas, USD 1.50 en públicas y USD 4 para docentes particulares.
 
-## 🚀 Pasos a futuro
+## Pasos a futuro
 Este es un plan, no algo ya logrado. El nicho son los universitarios de Lima.
 
 1. Piloto con estudiantes de la PUCP.
@@ -345,7 +345,7 @@ Este es un plan, no algo ya logrado. El nicho son los universitarios de Lima.
 
 También queremos leer imágenes, diagramas y PDF escaneados, sumar cuentas y hora de cierre, y conectarnos con Classroom.
 
-## 👥 Equipo
+## Equipo
 - **William:** tareas, almacenamiento, reportes y panel del profesor.
 - **Yoe:** defensa con Carlos, protección de casos y seguridad de la IA.
 - **Andre:** subida de documentos y generación de puntos.

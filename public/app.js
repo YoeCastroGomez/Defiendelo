@@ -771,16 +771,16 @@ function reporte() {
         if (res.dubitativo) {
           consejo += ' Responde con seguridad; evita muletillas como "creo que" o "tal vez".';
         }
-        tip.textContent = '💡 Recomendación: ' + consejo;
+        tip.textContent = 'Recomendación: ' + consejo;
 
         item.append(tit, duda, motivo, tip);
         guia.appendChild(item);
       });
 
       const alertas = [];
-      if (S.senales.leyo) alertas.push(`📖 Se detectó lectura casi literal en ${S.senales.leyo} punto(s). En la entrega, explica con tus propias palabras.`);
-      if (S.senales.dubitativo) alertas.push(`🤔 Usaste lenguaje dubitativo en ${S.senales.dubitativo} respuesta(s). Argumenta con mayor convicción.`);
-      if (S.senales.tiempoAgotado) alertas.push(`⏱️ En ${S.senales.tiempoAgotado} pregunta(s) se agotaron los 30 s para empezar a responder. Arranca con tu idea de inmediato.`);
+      if (S.senales.leyo) alertas.push(`Se detectó lectura casi literal en ${S.senales.leyo} punto(s). En la entrega, explica con tus propias palabras.`);
+      if (S.senales.dubitativo) alertas.push(`Usaste lenguaje dubitativo en ${S.senales.dubitativo} respuesta(s). Argumenta con mayor convicción.`);
+      if (S.senales.tiempoAgotado) alertas.push(`En ${S.senales.tiempoAgotado} pregunta(s) se agotaron los 30 s para empezar a responder. Arranca con tu idea de inmediato.`);
 
       let cAlertas = null;
       if (alertas.length) {
