@@ -388,12 +388,15 @@ function normalizarPuntos(crudos, fragmentos) {
 }
 
 // Respaldo sin IA: arma los 4 puntos a partir de fragmentos repartidos a lo largo del trabajo.
-export function puntosDeterministas(fragmentos) {
+// Con `evitar` (las dudas del ensayo), se corren los fragmentos y se excluyen los términos ya usados,
+// para que la entrega traiga dudas nuevas también sin IA.
+export function puntosDeterministas(fragmentos, evitar = []) {
   const n = fragmentos.length;
-  const elegidos = TIPOS.map((_, i) => fragmentos[Math.min(n - 1, Math.floor((i * n) / TIPOS.length))]);
+  const desplazamiento = evitar.length ? Math.max(1, Math.floor(n / (2 * TIPOS.length))) : 0;
+  const elegidos = TIPOS.map((_, i) => fragmentos[(Math.floor((i * n) / TIPOS.length) + desplazamiento) % n]);
   // Un término distinto por punto: p3 compara dos y no debe quedar "X vs. X".
   const df = frecuenciaDocumento(fragmentos);
-  const vistos = new Set();
+  const vistos = new Set(evitar.flatMap((x) => String(x).toLocaleLowerCase('es').match(/[\p{L}\p{N}]+/gu) || []));
   const t = elegidos.map((f) => {
     const termino = terminoClave(f, vistos, df, n);
     vistos.add(termino.toLocaleLowerCase('es'));
@@ -447,7 +450,7 @@ export function puntosDeterministas(fragmentos) {
 // Genera los 4 puntos con IA (un reintento si el JSON falla) o sin ella.
 export async function generarPuntos(datos, fragmentos) {
   if (!proveedorConfigurado()) {
-    return { puntos: puntosDeterministas(fragmentos), titulo: '', modoGeneracion: 'simulado' };
+    return { puntos: puntosDeterministas(fragmentos, datos.evitar || []), titulo: '', modoGeneracion: 'simulado' };
   }
   const sistema = promptSistema(datos, fragmentos);
   const doc = documentoParaPrompt(fragmentos);

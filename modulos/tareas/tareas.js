@@ -36,7 +36,7 @@ function tareaDemo() {
 
 export function normalizarCodigo(raw) {
   let codigo = limpio(raw, 12).toUpperCase().replace(/[\s_]/g, '');
-  if (codigo === 'DEMO01') codigo = 'DEMO-01';
+  if (codigo.replace(/-/g, '') === 'DEMO01') codigo = 'DEMO-01'; // también "DEM-O01" de clientes antiguos
   else if (/^[A-Z0-9]{6}$/.test(codigo)) codigo = codigo.slice(0, 3) + '-' + codigo.slice(3);
   if (!/^[A-Z0-9]{3,4}-[A-Z0-9]{2,3}$/.test(codigo)) {
     throw errorHttp('Código con formato inválido', 400);

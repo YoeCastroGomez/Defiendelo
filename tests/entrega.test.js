@@ -85,6 +85,15 @@ describe('dudas nuevas para la entrega', () => {
     for (const v of ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL']) delete process.env[v];
   });
 
+  test('sin IA, la entrega también trae dudas distintas a las del ensayo', async () => {
+    const ensayo = await generarCaso({ id: 'x1', texto, titulo: 'T', curso: 'C' });
+    const entrega = await generarCaso({ id: 'x2', texto, titulo: 'T', curso: 'C', evitar: ensayo.caso.puntos.map((p) => p.apertura) });
+    const temas = (c) => c.caso.puntos.map((p) => p.tema).join('|');
+    assert.notEqual(temas(entrega), temas(ensayo));
+    const ids = entrega.caso.documento.fragmentos.map((f) => f.id);
+    assert.ok(entrega.caso.puntos.every((p) => ids.includes(p.fragmento)));
+  });
+
   test('el prompt pide no repetir las dudas del ensayo', async () => {
     original = globalThis.fetch;
     Object.assign(process.env, { LLM_PROVIDER: 'gemini', LLM_API_KEY: 'k', LLM_MODEL: 'm' });

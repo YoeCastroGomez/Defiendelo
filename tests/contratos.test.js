@@ -131,6 +131,10 @@ describe('/api/tareas', () => {
     assert.equal('tokenProfesor' in r.json, false);
   });
 
+  test('GET de DEMO-01 acepta el código partido como uno normal (DEM-O01)', async () => {
+    assert.equal((await llamar(apiTareas, { query: { codigo: 'dem-o01' } })).json.codigo, 'DEMO-01');
+  });
+
   test('GET de DEMO-01 funciona sin guion y sin exponer el token', async () => {
     const r = await llamar(apiTareas, { query: { codigo: 'demo01' } });
     assert.equal(r.status, 200);
