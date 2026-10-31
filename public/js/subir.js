@@ -325,9 +325,8 @@
   });
 
   /* ---------- profesor: material de la tarea (guías, plantillas y teoría en una sola caja) ---------- */
-  // Cada archivo lleva su tipo. Las guías y plantillas le dicen a Carlos qué se pidió; la teoría le da
-  // contexto del curso. El servidor admite hasta 5 de cada grupo.
-  const TIPOS_MATERIAL = { guia: 'Guía o rúbrica', plantilla: 'Plantilla', teoria: 'Teoría del curso' };
+  // Las guías y plantillas le dicen a Carlos qué se pidió; la teoría le da contexto del curso.
+  // El servidor admite hasta 5 archivos de cada grupo.
   const MAX_ARCHIVOS_CAJA = MAX_ARCHIVOS_MATERIAL * 2;
   const adivinarTipo = (nombre) => (/teor|lectura|apunte|cap[ií]tulo|clase|separata/i.test(nombre) ? 'teoria'
     : /plantilla|formato|template|modelo/i.test(nombre) ? 'plantilla' : 'guia');
@@ -345,22 +344,13 @@
         const nombre = document.createElement('span');
         nombre.textContent = d.nombre;
         nombre.style.flex = '1';
-        const tipo = document.createElement('select');
-        tipo.setAttribute('aria-label', 'Tipo de ' + d.nombre);
-        tipo.style.width = 'auto';
-        for (const [valor, texto] of Object.entries(TIPOS_MATERIAL)) {
-          const o = document.createElement('option');
-          o.value = valor; o.textContent = texto; o.selected = d.tipo === valor;
-          tipo.appendChild(o);
-        }
-        tipo.onchange = () => { d.tipo = tipo.value; };
         const quitar = document.createElement('button');
         quitar.type = 'button';
         quitar.className = 'enlace-texto';
         quitar.textContent = 'Quitar';
         quitar.setAttribute('aria-label', 'Quitar ' + d.nombre);
         quitar.onclick = () => { documentos = documentos.filter((x) => x !== d); pintar(); };
-        fila.append(nombre, tipo, quitar);
+        fila.append(nombre, quitar);
         return fila;
       }));
     }
@@ -381,18 +371,21 @@
     });
     $(idCaja).appendChild(lista);
 
-    // Se valida al crear la tarea, porque el profesor puede cambiar el tipo de cada archivo hasta el final.
-    function grupo(filtro, max, palabras, nombreGrupo) {
-      const docs = documentos.filter(filtro);
-      if (docs.length > max) throw new Error(`Puedes subir hasta ${max} archivos de ${nombreGrupo}.`);
-      const total = docs.reduce((n, d) => n + contarPalabras(d.texto), 0);
-      if (total > palabras) throw new Error(`Los archivos de ${nombreGrupo} suman ${total.toLocaleString('es-PE')} palabras y el máximo es ${palabras.toLocaleString('es-PE')}.`);
-      return docs;
-    }
+    // El profesor no clasifica nada: por el nombre del archivo se separa lo que dice qué se pidió (guías,
+    // rúbricas, plantillas) de la teoría. Lo que no quepa en el grupo de guías pasa a material de contexto.
+    const palabrasDe = (docs) => docs.reduce((n, d) => n + contarPalabras(d.texto), 0);
     return () => {
-      const guias = grupo((d) => !esTeoria(d), MAX_ARCHIVOS_MATERIAL, MAX_PALABRAS_ENUNCIADO, 'guías y plantillas');
-      const teoria = grupo(esTeoria, MAX_ARCHIVOS_MATERIAL, MAX_PALABRAS_TEORIA, 'teoría');
-      const unir = (docs) => docs.map((d) => `--- ${TIPOS_MATERIAL[d.tipo]}: ${d.nombre} ---\n${d.texto}`).join('\n\n');
+      const guias = [];
+      const teoria = documentos.filter(esTeoria);
+      for (const d of documentos.filter((x) => !esTeoria(x))) {
+        if (guias.length < MAX_ARCHIVOS_MATERIAL && palabrasDe(guias) + contarPalabras(d.texto) <= MAX_PALABRAS_ENUNCIADO) guias.push(d);
+        else teoria.push(d);
+      }
+      const total = palabrasDe(teoria);
+      if (teoria.length > MAX_ARCHIVOS_MATERIAL || total > MAX_PALABRAS_TEORIA) {
+        throw new Error(`El material es demasiado largo (${documentos.length} archivos, ${palabrasDe(documentos).toLocaleString('es-PE')} palabras). Quita algún archivo e intenta de nuevo.`);
+      }
+      const unir = (docs) => docs.map((d) => `--- ${d.nombre} ---\n${d.texto}`).join('\n\n');
       return {
         enunciado: unir(guias),
         enunciadoNombre: guias.map((d) => d.nombre).join(', ').slice(0, 120),
@@ -470,6 +463,7 @@
   function fijarMinimo() { $('t-fecha').min = aLocal(new Date()); }
   document.querySelectorAll('input[name=t-tipo]').forEach((r) => r.addEventListener('change', () => {
     $('t-fecha-ayuda').textContent = AYUDA_FECHA[tipoActividad()] || '';
+    $('op-escrito').classList.toggle('oculto', tipoActividad() !== 'evaluacion');
   }));
   document.querySelectorAll('[data-plazo]').forEach((b) => {
     b.onclick = () => {
@@ -489,6 +483,6 @@
     if (!valor) throw new Error('Elige la fecha límite.');
     const fecha = new Date(valor); // se interpreta en la hora local del profesor
     if (!(fecha.getTime() > Date.now())) throw new Error('La fecha límite ya pasó: elige una fecha futura.');
-    return { tipoActividad: tipo, fechaLimite: fecha.toISOString() };
+    return { tipoActividad: tipo, fechaLimite: fecha.toISOString(), permitirEscrito: tipo === 'evaluacion' && $('t-escrito').checked };
   };
 })();

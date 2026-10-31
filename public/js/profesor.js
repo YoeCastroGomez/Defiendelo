@@ -198,9 +198,24 @@
     return Object.entries(resultados || {}).sort(([a], [b]) => a.localeCompare(b, 'es', { numeric: true }));
   }
 
-  function renderizarKPIs(sesiones) {
+  // En una práctica cada estudiante puede tener varios intentos: el resumen usa el último de cada uno.
+  // (Las sesiones llegan de la más nueva a la más antigua.)
+  function ultimoPorEstudiante(sesiones) {
+    const vistos = new Set();
+    return sesiones.filter((s) => {
+      const clave = String(s.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      if (vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    });
+  }
+  const esPracticaPanel = () => estadoPanel.tarea?.tipoActividad === 'practica' || estadoPanel.tarea?.codigo === 'DEMO-01';
+
+  function renderizarKPIs(todas) {
+    const sesiones = esPracticaPanel() ? ultimoPorEstudiante(todas) : todas;
     const total = sesiones.length;
     const curso = estadoPanel.tarea?.curso || '';
+    $('kpi-total-etq').textContent = esPracticaPanel() ? `estudiantes · ${todas.length} intento${todas.length === 1 ? '' : 's'} en total` : 'entregas recibidas';
     $('kpi-total').textContent = String(total);
 
     if (!total) {
@@ -266,7 +281,7 @@
       bNom.textContent = ses.nombre;
       const sMeta = document.createElement('span');
       sMeta.className = 'mono chico suave';
-      sMeta.textContent = ` · ${formatearDuracion(ses.duracionSegundos)}`;
+      sMeta.textContent = (esPracticaPanel() && ses.numeroIntento ? ` · intento ${ses.numeroIntento}` : '') + ` · ${formatearDuracion(ses.duracionSegundos)}`;
       colNombre.append(bNom, sMeta);
 
       const colMatriz = document.createElement('div');
@@ -394,6 +409,8 @@
     if (s.captura) alertas.push(`${s.captura} intento(s) de captura o impresión`);
     if (s.iaCaida) alertas.push('evaluada parcialmente en modo respaldo');
     if (s.fueraDePlazo) alertas.push('entregada después de la fecha límite');
+    const escritos = Object.values(ses.resultados || {}).filter((r) => r.via === 'texto').length;
+    if (escritos && !esPracticaPanel()) alertas.push(`${escritos} punto(s) respondidos por escrito (lo permitiste en esta evaluación)`);
     if (s.abandonada) alertas.push('salió a mitad de la entrega: se cerró con lo que alcanzó a responder');
     const pendientes = Object.values(ses.resultados || {}).filter((r) => r.pendiente).length;
     if (pendientes) alertas.push(`${pendientes} punto(s) con una repregunta sin responder`);
@@ -582,13 +599,14 @@
       const t = String(v ?? '');
       return `"${(/^[=+\-@\t\r]/.test(t) ? "'" + t : t).replace(/"/g, '""')}"`;
     };
-    const cab = ['Estudiante', 'Nivel sugerido', 'Duracion (s)', 'Puntos verdes', 'Total puntos', 'Alertas totales', 'Leyo literal', 'Dubitativo', 'Salidas pestana', 'Pegado bloqueado', 'Capturas', 'Salio a mitad', 'Puntos sin registro', 'Fuera de plazo', 'Fecha ISO'];
+    const cab = ['Estudiante', 'Intento', 'Nivel sugerido', 'Duracion (s)', 'Puntos verdes', 'Total puntos', 'Alertas totales', 'Leyo literal', 'Dubitativo', 'Salidas pestana', 'Pegado bloqueado', 'Capturas', 'Salio a mitad', 'Puntos sin registro', 'Fuera de plazo', 'Fecha ISO'];
     const filas = estadoPanel.sesiones.map((s) => {
       const pts = Object.values(s.resultados || {});
       const verdes = pts.filter((p) => p.nivel === 'verde').length;
       const sen = s.senales || {};
       return [
         s.nombre,
+        s.numeroIntento || 1,
         ETIQUETA_NIVEL[s.nivelGeneral] || s.nivelGeneral,
         s.duracionSegundos || 0,
         verdes,

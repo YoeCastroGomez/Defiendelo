@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { guardar, leer, reemplazar, agregar, listar, incrementar } from '../../compartido/almacen.js';
 import { errorHttp, limpio, igualSeguro } from '../../compartido/http.js';
 import { cargarCaso, esCasoPrivado, formatoCasoValido } from '../casos/casos.js';
+import { esRepetible } from '../tareas/tareas.js';
 
 export const CODIGO_DEMO = 'DEMO-01'; // se puede repetir: lo usan el jurado y quienes prueban la app
 const MAX_TURNOS_POR_PUNTO = 2; // la respuesta y, como mucho, una repregunta
@@ -18,10 +19,11 @@ const esDemo = (codigo) => codigo === CODIGO_DEMO;
 //   entrega:<codigo>:<nombre>    → marca atómica de que ese estudiante ya entregó (o entrega-intento:<id> en la demo)
 //   intentos:<codigo>            → lista de intentos abiertos, para cerrar los abandonados
 const claveVigente = (codigo, nombre) => `intento-de:${codigo}:${claveNombre(nombre)}`;
-export const claveEntrega = (intento) => (esDemo(intento.codigo) ? `entrega-intento:${intento.id}` : `entrega:${intento.codigo}:${claveNombre(intento.nombre)}`);
+// En una práctica (o la demo) cada intento es una entrega propia; en una evaluación, una por estudiante.
+export const claveEntrega = (intento) => (intento.repetible || esDemo(intento.codigo) ? `entrega-intento:${intento.id}` : `entrega:${intento.codigo}:${claveNombre(intento.nombre)}`);
 
 export async function entregaPrevia(tarea, nombre) {
-  if (esDemo(tarea.codigo)) return null;
+  if (esRepetible(tarea)) return null;
   const marca = await leer(`entrega:${tarea.codigo}:${claveNombre(nombre)}`);
   if (marca) return marca;
   // Entregas guardadas antes de que existiera la marca.
@@ -49,7 +51,7 @@ export async function intentoVigenteDe(codigo, nombre) {
 // Crea el intento y lo deja como el único vigente de ese nombre. Si dos se abren a la vez, gana el
 // último en escribirse y el otro deja de servir (ver esIntentoVigente).
 export async function crearIntento(tarea, nombre, casoId) {
-  const intento = { id: randomBytes(12).toString('hex'), codigo: tarea.codigo, casoId, nombre, creado: new Date().toISOString() };
+  const intento = { id: randomBytes(12).toString('hex'), codigo: tarea.codigo, casoId, nombre, repetible: esRepetible(tarea), creado: new Date().toISOString() };
   while (!(await guardar('intento:' + intento.id, intento))) intento.id = randomBytes(12).toString('hex');
   if (!esDemo(tarea.codigo)) {
     const clave = claveVigente(tarea.codigo, nombre);

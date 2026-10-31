@@ -51,6 +51,11 @@ function fechaLimiteValida(raw) {
 
 // ¿Venció el plazo de la tarea? Las tareas antiguas o la demo no tienen fecha y nunca vencen.
 export const plazoVencido = (tarea, ahora = Date.now()) => !!tarea?.fechaLimite && ahora > Date.parse(tarea.fechaLimite);
+// En una práctica el estudiante rinde las veces que quiera; en una evaluación, una sola vez.
+// Las tareas antiguas, sin tipo, se tratan como evaluación. La demo siempre se puede repetir.
+export const esRepetible = (tarea) => tarea?.codigo === 'DEMO-01' || tarea?.tipoActividad === 'practica';
+// En una evaluación solo se responde por voz, salvo que el profesor permita responder por escrito.
+export const soloVoz = (tarea) => !esRepetible(tarea) && tarea?.tipoActividad === 'evaluacion' && !tarea.permitirEscrito;
 // En una evaluación vencida ya no se reciben entregas nuevas (igual que una tarea cerrada).
 export const noRecibeEntregas = (tarea) => !!tarea.cerrada || (tarea.tipoActividad === 'evaluacion' && plazoVencido(tarea));
 
@@ -103,6 +108,8 @@ export async function crearTarea(datos = {}) {
     cierre: '', // reemplazado por fechaLimite; se conserva para las tareas antiguas
     tipoActividad: datos.tipoActividad,
     fechaLimite,
+    // Solo tiene sentido en una evaluación: casos justificados (dificultad del habla, sin micrófono).
+    permitirEscrito: datos.tipoActividad === 'evaluacion' && datos.permitirEscrito === true,
     casoId,
     cerrada: false,
     tokenProfesor,

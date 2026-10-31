@@ -4,11 +4,11 @@
 import { randomBytes } from 'node:crypto';
 import { agregar, listar, leer, recortarLista } from '../../compartido/almacen.js';
 import { errorHttp, limpio } from '../../compartido/http.js';
-import { obtenerTareaInterna, verificarTokenProfesor, plazoVencido } from '../tareas/tareas.js';
+import { obtenerTareaInterna, verificarTokenProfesor, plazoVencido, esRepetible } from '../tareas/tareas.js';
 import { cargarCaso } from '../casos/casos.js';
 import {
   leerIntento, evaluacionesFinales, evaluacionesDe, entregaPrevia, casoDelIntento, crearIntento,
-  intentoVigenteDe, esIntentoVigente, entregaDelIntento, marcarEntrega, listarIntentos, CODIGO_DEMO,
+  intentoVigenteDe, esIntentoVigente, entregaDelIntento, marcarEntrega, listarIntentos, CODIGO_DEMO, claveNombre,
 } from './intentos.js';
 
 const MAX_SESIONES_DEMO = 200; // la demo admite entregas ilimitadas: solo se guardan las últimas
@@ -51,7 +51,8 @@ function resultadosRegistrados(caso, finales) {
       motivo: reg.pendiente ? `${f.motivo} (Carlos le repreguntó y no alcanzó a responder.)`.trim() : f.motivo,
       evidencia: f.evidencia,
       leyo: reg.turnos.some((t) => t.leyo), dubitativo: reg.turnos.some((t) => t.dubitativo),
-      origen: f.origen, ...(reg.pendiente ? { pendiente: true } : {}), conversacion,
+      origen: f.origen, ...(reg.pendiente ? { pendiente: true } : {}),
+      via: reg.turnos.some((t) => t.via === 'texto') ? 'texto' : 'voz', conversacion,
     };
   }
   return resultados;
@@ -82,14 +83,15 @@ export async function iniciarIntento({ codigo, nombre, casoId, llave } = {}) {
   if (!n) throw errorHttp('Falta el nombre del estudiante', 400);
   const tarea = await obtenerTareaInterna(codigo);
   if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
-  if (tarea.cerrada) throw errorHttp('Esta tarea está cerrada: ya no recibe entregas. Todavía puedes ensayar.', 403);
-  if (tarea.tipoActividad === 'evaluacion' && plazoVencido(tarea)) throw errorHttp('El plazo de esta evaluación ya venció: ya no recibe entregas. Todavía puedes ensayar.', 403);
-  if (await entregaPrevia(tarea, n)) throw errorHttp('Ya entregaste esta tarea con ese nombre. Solo se permite un intento; puedes seguir ensayando.', 409);
+  if (tarea.cerrada) throw errorHttp('Esta tarea está cerrada: ya no recibe entregas.', 403);
+  if (tarea.tipoActividad === 'evaluacion' && plazoVencido(tarea)) throw errorHttp('El plazo de esta evaluación ya venció: ya no recibe entregas.', 403);
+  if (await entregaPrevia(tarea, n)) throw errorHttp('Ya rendiste esta evaluación con ese nombre. Solo se permite un intento.', 409);
 
   const previo = tarea.codigo === CODIGO_DEMO ? null : await intentoVigenteDe(tarea.codigo, n);
-  if (previo && (await evaluacionesDe(previo)).length) {
+  if (previo && !(await entregaDelIntento(previo)) && (await evaluacionesDe(previo)).length) {
     await cerrarIntento(previo, { abandonada: true });
-    throw errorHttp('Ya habías empezado esta entrega y saliste a mitad: se entregó lo que alcanzaste a responder. Solo se permite un intento; puedes seguir ensayando.', 409);
+    // En una práctica se puede volver a rendir: el intento a medias queda registrado y se abre otro.
+    if (!esRepetible(tarea)) throw errorHttp('Ya habías empezado esta evaluación y saliste a mitad: se entregó lo que alcanzaste a responder. Solo se permite un intento.', 409);
   }
   const intento = await crearIntento(tarea, n, await casoDelIntento(tarea, casoId, llave));
   return { intento: intento.id, casoId: intento.casoId };
@@ -131,6 +133,11 @@ async function cerrarIntento(intento, { senales: senalesRaw, abandonada = false 
   const transcurrido = Math.round((fin - Date.parse(intento.creado)) / 1000);
   const duracionSegundos = Math.max(0, Math.min(7200, Number.isFinite(transcurrido) ? transcurrido : 0));
 
+  // En una práctica, el número de intento de ese estudiante (1, 2, 3…).
+  const numeroIntento = esRepetible(tarea)
+    ? (await listar('sesiones:' + tarea.codigo)).filter((s) => claveNombre(s.nombre) === claveNombre(intento.nombre)).length + 1
+    : 1;
+
   const sesion = {
     id: 'ses_' + randomBytes(5).toString('hex'),
     universidadId: 'demo',
@@ -140,6 +147,7 @@ async function cerrarIntento(intento, { senales: senalesRaw, abandonada = false 
     modo: 'evaluacion',
     nivelGeneral,
     intento: intento.id,
+    numeroIntento,
     duracionSegundos,
     resultados,
     senales,
@@ -195,6 +203,7 @@ export async function consultarSesiones(codigoRaw, tokenRecibido) {
       cierre: tarea.cierre,
       tipoActividad: tarea.tipoActividad || null,
       fechaLimite: tarea.fechaLimite || null,
+      permitirEscrito: !!tarea.permitirEscrito,
       cerrada: !!tarea.cerrada,
       casoId: tarea.casoId,
       creada: tarea.creada,
