@@ -18,7 +18,8 @@ Con la IA generativa, un estudiante puede entregar un trabajo impecable sin ente
 - **Los detectores de IA** son poco confiables y generan acusaciones injustas.
 - **Una defensa oral manual** sí funciona, pero no escala: a unos 15 minutos por alumno, una clase de 40 son 10 horas por tarea.
 
-<!-- TODO: agregar aquí lo aprendido con usuarios reales (entrevistas a estudiantes y profesores, citas, números). Es el 30 % de la evaluación. -->
+### Aprendizajes con usuarios reales
+<!-- TODO: completar con las entrevistas reales (3 a 5 estudiantes y 1 a 2 profesores): citas textuales, tiempos medidos y qué cambió en el producto. Es el 30 % de la evaluación. No inventar datos. -->
 
 ### La solución
 Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 minutos. El estudiante no responde a un examinador: **le enseña su trabajo a Carlos**, un compañero de IA que no lo entiende y que a veces se equivoca con mucha seguridad.
@@ -29,18 +30,19 @@ Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 
 - El trabajo está **a la vista todo el tiempo**. Carlos señala la parte de la que habla y, al final, el reporte es **el mismo trabajo marcado** en verde, amarillo o rojo según lo que el estudiante pudo explicar.
 
 ### Cómo llega la tarea al estudiante
-1. El **profesor** crea la tarea (curso, título, qué deben poder explicar, trabajo base y cierre) y recibe un **código** tipo `KXS-3NT`.
-2. Lo comparte con la clase, o comparte el enlace directo `…/?codigo=KXS-3NT`.
-3. El **estudiante** ingresa el código, ve qué espera su profesor que pueda explicar, escribe su nombre y elige el modo.
+1. El **profesor** crea la tarea (curso, título, qué deben poder explicar y cierre) y recibe un **código** tipo `KXS-3NT` y un **token privado** para ver los reportes.
+2. Elige de dónde sale el trabajo: **cada estudiante sube el suyo** o **toda la clase defiende un trabajo base**.
+3. Comparte el código con la clase, o el enlace directo `…/?codigo=KXS-3NT`.
+4. El **estudiante** ingresa el código, escribe su nombre y elige el modo. Si la tarea lo pide, sube su `.pdf` o `.docx` (hasta 10 MB) o pega su texto.
 
 Los códigos usan un alfabeto sin caracteres confusos (sin `0/O` ni `1/I/L`) para que se puedan dictar en clase, y se aceptan en minúsculas o sin guion. El código `DEMO-01` siempre abre la tarea de demostración.
 
 ### Dos modos
 | | Práctica | Evaluación |
 |---|---|---|
-| Quién la inicia | El estudiante, cuando quiera | El profesor, con un enlace |
+| Objetivo | Ensayar antes de la entrega | Defensa registrada para el profesor |
 | Quién ve el reporte | Solo el estudiante | El estudiante y el profesor |
-| Al terminar | Qué repasar y reintento | Queda registrado |
+| Se guarda en el servidor | No | Sí, automáticamente |
 | Pegar texto | Permitido | Bloqueado (y se registra el intento) |
 
 El profesor siempre decide la nota. Defiéndelo solo **sugiere un nivel** y entrega la evidencia.
@@ -52,31 +54,37 @@ Existen herramientas de evaluación oral con IA (Viva de NYU Stern, Viva de Init
 
 ## ⚙️ Arquitectura y tecnologías
 
+Monolito modular de 3 capas. Las dependencias van en una sola dirección: `api/` → `modulos/` → `compartido/`.
+
 ```
-Navegador (public/)                         Servidor (api/ + lib/)
-┌──────────────────────────────┐            ┌─────────────────────────────┐
-│ index.html + app.js          │  POST      │ api/carlos.js               │
-│ - Documento por fragmentos   │ ─────────▶ │  └ lib/turno.js             │
-│ - Dictado (Web Speech API)   │  JSON      │     - arma el prompt de     │
-│ - Voz de Carlos (TTS nativo) │ ◀───────── │       Carlos con el caso    │
-│ - Detección de lectura       │            │     - valida el JSON        │
-│ - Reporte y documento marcado│            │  └ lib/llm.js               │
-│ - Modo simulado de respaldo  │            │     - adaptador de          │
-└──────────────────────────────┘            │       proveedores de IA     │
-            │                               └─────────────────────────────┘
-            ▼
-  public/casos/<caso>.json  (trabajo en fragmentos + puntos que explora Carlos)
+Navegador (public/)
+  app.js · js/profesor.js · js/subir.js
+  Extrae el texto del .pdf/.docx, dicta por voz y detecta lectura literal
+        │ JSON
+        ▼
+Capa 1 · Entrada HTTP (api/)
+  carlos · casos · tareas · sesiones · documentos
+        │
+        ▼
+Capa 2 · Lógica de negocio (modulos/)
+  defensa · casos · tareas · reportes · documentos
+        │
+        ▼
+Capa 3 · Infraestructura (compartido/)
+  llm.js ──▶ proveedor de IA      almacen.js ──▶ Upstash Redis o memoria
 ```
 
 | Componente | Tecnología | Decisión |
 |---|---|---|
 | Frontend | HTML, CSS y JavaScript sin frameworks | Carga instantánea y cero dependencias para una demo confiable. |
-| Dictado | Web Speech API (`SpeechRecognition`, `es-PE`) | Gratis y en el navegador; no se envía audio a nuestro servidor. |
+| Subida de trabajos | PDF.js y Mammoth.js en el navegador | El texto se extrae en el cliente: el archivo original no se guarda ni pasa por el servidor. |
+| Dictado | Web Speech API (`es-PE`) | Gratis y en el navegador; no se envía audio a nuestro servidor. |
 | Voz de Carlos | `speechSynthesis` del navegador | Sin costo; se puede apagar. |
-| Backend | Función serverless de Vercel (`api/carlos.js`) | La API key nunca llega al navegador. |
-| IA | Adaptador propio: Anthropic, OpenAI, Groq, Gemini o cualquier API compatible con OpenAI | El proveedor se cambia con variables de entorno, sin tocar código. |
-| Caso | JSON (`public/casos/*.json`) | El trabajo viene dividido en fragmentos con ID, así lo que señala Carlos siempre se puede resaltar. |
-| Tareas y códigos | `api/tareas.js` + Redis de Upstash (opcional) | Sin configurar, las tareas viven en memoria del servidor; con Upstash, persisten 60 días y funcionan en Vercel. |
+| Backend | Funciones serverless de Vercel sobre Node.js 18+ | Sin dependencias npm; la API key nunca llega al navegador. |
+| IA | Adaptador propio; en la demo, Gemini Flash-Lite | El proveedor se cambia con variables de entorno, sin tocar código. |
+| Persistencia | Upstash Redis (60 días), con respaldo en memoria | Funciona en Vercel y también en local sin configurar nada. |
+| Reportes | `tokenProfesor` por tarea | Protege los reportes sin construir un sistema de cuentas. |
+| Pruebas | `node:test` | Se ejecutan con `node --test`, sin instalar nada. |
 
 ### Cómo funciona un turno
 1. Cada **punto** del caso está atado a un fragmento del trabajo. Carlos abre el punto con una pregunta (y, si corresponde, con un error a propósito) y ese fragmento se resalta.
@@ -90,20 +98,26 @@ Navegador (public/)                         Servidor (api/ + lib/)
 
 Una sola llamada por turno mantiene el costo en centavos por defensa.
 
+### Seguridad
+- Lo que el estudiante debe explicar y los errores a propósito de Carlos **nunca llegan al navegador**: `/api/casos` los elimina.
+- Las respuestas del estudiante se tratan como datos a evaluar, no como instrucciones. Pedirle a Carlos “ponme verde” se califica en rojo.
+- `/api/carlos` limita a 30 peticiones por minuto por IP y no reenvía al cliente los errores crudos del proveedor.
+- El servidor **recalcula el nivel general**: ignora el que envíe el cliente.
+- Los reportes exigen el token del profesor en la cabecera `x-token-profesor`.
+
 ### Estructura
 ```
-api/carlos.js          Endpoint serverless (GET: estado de la IA, POST: turno)
-api/tareas.js          POST: el profesor crea una tarea y recibe el código · GET ?codigo=: el estudiante la carga
-lib/turno.js           Prompt de Carlos, evaluación y validación del JSON
-lib/llm.js             Adaptador de proveedores de IA
-lib/almacen.js         Almacenamiento de tareas (Upstash Redis o memoria)
-public/casos/index.json Lista de trabajos base que puede elegir el profesor
-public/index.html      Pantallas: inicio, defensa, reporte
-public/app.js          Lógica del cliente
-public/estilos.css     Estilos
-public/casos/demo.json Caso de ejemplo
-server.js              Servidor local sin dependencias
-vercel.json            Incluye los casos en la función serverless
+api/                  Entrada HTTP: carlos, casos, tareas, sesiones, documentos
+modulos/defensa/      Prompt de Carlos, evaluación del turno y reintento de JSON
+modulos/casos/        Carga y sanitización de casos; datos/ guarda los casos base
+modulos/tareas/       Códigos, tokenProfesor y tarea pública
+modulos/reportes/     Sesiones de evaluación y recálculo del nivel general
+modulos/documentos/   Fragmentación del trabajo y generación de los 4 puntos
+compartido/           almacen.js (Redis o memoria) y llm.js (proveedores de IA)
+public/               Pantallas, estilos y lógica del navegador
+tests/                Pruebas de contratos con node:test
+server.js             Servidor local sin dependencias
+vercel.json           Incluye los casos en las funciones y fija maxDuration
 ```
 
 ---
@@ -113,11 +127,11 @@ vercel.json            Incluye los casos en la función serverless
 `<!-- TODO: enlace de Vercel -->`
 
 **Uso:**
-0. Como profesor: *Crear tarea* → *Generar código*. Como estudiante: ingresa ese código (o `DEMO-01`) y tu nombre.
-1. Elige **Práctica** o **Evaluación** y pulsa *Empezar con Carlos*.
-2. Carlos te hace una pregunta y resalta la parte de tu trabajo de la que habla.
-3. Pulsa **● Hablar** (en Chrome) o escribe tu explicación, y luego **Responder**.
-4. Al final verás tu trabajo marcado. Haz clic en una parte marcada para ver qué dijiste.
+1. Como profesor: *Crear tarea* → *Generar código*, y guarda el token. Como estudiante: ingresa ese código (o `DEMO-01`) y tu nombre.
+2. Si la tarea lo pide, sube tu `.pdf` o `.docx`. Elige **Práctica** o **Evaluación** y pulsa *Empezar con Carlos*.
+3. Carlos te hace una pregunta y resalta la parte de tu trabajo de la que habla.
+4. Pulsa **● Hablar** (en Chrome o Edge) o escribe tu explicación, y luego **Responder**.
+5. Al final verás tu trabajo marcado. En modo Evaluación, el profesor lo ve en *Ver reportes* con su código y su token.
 
 Si la IA no está configurada, la app funciona en **modo simulado**: el botón *Simular respuesta* llena una respuesta de ejemplo y la evaluación usa resultados predefinidos.
 
@@ -125,25 +139,28 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 
 ## ✅ Funcionalidades implementadas
 
-**Funciona de verdad**
-- El profesor crea una tarea y obtiene un código y un enlace para compartir.
-- El estudiante entra con el código y ve lo que su profesor espera que explique.
+- El profesor crea una tarea y obtiene un código, un enlace para compartir y un token privado.
+- Tareas con entrega individual o con un trabajo base común.
+- Generación de 4 puntos específicos a partir del texto del trabajo, con IA o con un respaldo sin IA.
+- Subida de `.pdf` y `.docx` de hasta 10 MB, o texto pegado, de 50 a 15 000 palabras.
 - Flujo completo: código → defensa con Carlos → reporte.
 - Modos práctica y evaluación.
-- Carlos conducido por IA real, con repregunta y evaluación por punto (al configurar un proveedor).
+- Carlos conducido por IA real, con repregunta y evaluación por punto.
 - Dictado por voz y voz de Carlos en el navegador.
 - Documento visible con el fragmento señalado y pintado en vivo.
 - Reporte con el trabajo marcado, evidencia por punto y nivel sugerido.
-- Señales de sesión: respuestas leídas del trabajo, salidas de la pestaña e intentos de pegar en evaluación.
+- Panel del profesor con entregas, señales, conversación por punto y trabajo marcado.
+- Señales de sesión: respuestas leídas del trabajo, salidas de la pestaña, intentos de pegar y de captura.
 - Respaldo automático a modo simulado si la IA falla en medio de la sesión.
 
 **Limitaciones actuales**
-- El trabajo y sus puntos vienen de un **caso preparado** (`casos/demo.json`). Aún no se sube un PDF propio: la extracción de fragmentos con PDF.js y la generación automática de puntos con IA están en el plan.
+- **Los PDF escaneados no se leen** porque no hay OCR: hace falta texto seleccionable o un `.docx`.
 - **No hay cuentas**: cualquiera con el código entra a la tarea, y el estudiante se identifica solo con su nombre.
-- **Sin Upstash configurado, las tareas viven en memoria**: en local duran mientras el servidor esté encendido; en Vercel pueden perderse cuando la función se reinicia. `DEMO-01` funciona siempre.
-- **Los reportes no se guardan**: el reporte de evaluación no llega aún al profesor; se muestra al final de la sesión.
+- **El token del profesor se muestra una sola vez** y no se puede recuperar.
+- **El límite por IP puede afectar a una clase** que comparte la misma red.
+- **Sin Upstash, los datos viven en memoria**: en Vercel pueden perderse cuando la función se reinicia. `DEMO-01` funciona siempre.
 - El dictado depende del navegador (funciona en Chrome y Edge; en otros, se escribe).
-- Las señales de sesión son alertas para revisar, no prueban nada por sí solas.
+- Las señales de sesión son alertas para revisar, no prueban nada por sí solas. Ninguna web puede impedir una foto a la pantalla.
 - No se graba audio ni video.
 
 ---
@@ -153,10 +170,11 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 Requisitos: **Node.js 18 o superior**. No hay dependencias que instalar.
 
 ```bash
-git clone <repo>
-cd defiendelo
+git clone https://github.com/YoeCastroGomez/Defiendelo.git
+cd Defiendelo
 cp .env.example .env     # opcional: sin .env funciona en modo simulado
 node server.js           # http://localhost:3000
+node --test              # pruebas, sin red ni .env
 ```
 
 ### Configurar la IA
@@ -166,26 +184,26 @@ En `.env` (local) o en las variables de entorno de Vercel:
 |---|---|
 | `LLM_PROVIDER` | `anthropic`, `openai`, `groq`, `gemini` u `openai-compatible` |
 | `LLM_API_KEY` | Clave del proveedor |
-| `LLM_MODEL` | Nombre exacto del modelo del proveedor |
+| `LLM_MODEL` | Nombre exacto del modelo. Usamos `gemini-flash-lite-latest`: los modelos más lentos pueden superar el tiempo límite al generar los puntos de un documento |
 | `LLM_BASE_URL` | Solo para `openai-compatible` |
 
-### Guardar las tareas (recomendado en Vercel)
-Crea una base Redis gratuita en [Upstash](https://upstash.com) (o desde el marketplace de Vercel) y agrega:
+### Guardar los datos (recomendado en Vercel)
+Crea una base Redis gratuita en [Upstash](https://upstash.com) y agrega:
 
 | Variable | Valor |
 |---|---|
 | `UPSTASH_REDIS_REST_URL` | URL REST de la base |
 | `UPSTASH_REDIS_REST_TOKEN` | Token REST |
 
-Sin estas variables, las tareas se guardan en memoria.
+Sin estas variables, los datos se guardan en memoria.
 
 ### Desplegar en Vercel
 1. Importa el repositorio en Vercel (no necesita configuración de build).
 2. Agrega las variables de entorno de arriba.
-3. Despliega. El frontend se sirve desde `public/` y el endpoint queda en `/api/carlos`.
+3. Despliega. El frontend se sirve desde `public/` y los endpoints quedan en `/api/`.
 
-### Agregar un caso
-Crea `public/casos/<id>.json` con la misma estructura de `demo.json` (fragmentos del trabajo y puntos con `fragmento`, `apertura`, `error_de_carlos`, `que_debe_explicar` y `simulado`) y agrégalo a `public/casos/index.json` para que el profesor pueda elegirlo al crear la tarea.
+### Agregar un caso base
+Crea `modulos/casos/datos/<id>.json` con la misma estructura de `demo.json` (fragmentos del trabajo y puntos con `fragmento`, `apertura`, `error_de_carlos` y `que_debe_explicar`) y agrégalo a `modulos/casos/datos/index.json` para que el profesor pueda elegirlo al crear la tarea.
 
 ---
 
@@ -196,4 +214,7 @@ Crea `public/casos/<id>.json` con la misma estructura de `demo.json` (fragmentos
 - **Ingreso secundario:** práctica de sustentación de tesis pagada por el estudiante.
 
 ## 👥 Equipo
-<!-- TODO: nombres y roles -->
+- **William:** tareas, almacenamiento, reportes y panel del profesor.
+- **Yoe:** defensa con Carlos, protección de casos y seguridad de la IA.
+- **Andre:** subida de documentos y generación de puntos.
+- **Javier:** infraestructura, pruebas, validación con usuarios y pitch.
