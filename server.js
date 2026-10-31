@@ -10,7 +10,7 @@ const RAIZ = path.dirname(fileURLToPath(import.meta.url));
 if (existsSync(path.join(RAIZ, '.env'))) {
   for (const l of readFileSync(path.join(RAIZ, '.env'), 'utf8').split('\n')) {
     const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '').trim();
   }
 }
 

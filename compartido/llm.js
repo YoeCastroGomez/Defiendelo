@@ -82,7 +82,7 @@ export async function llamarLLM(sistema, mensajes, opciones = {}) {
       try {
         return await post(url(m), { 'x-goog-api-key': key }, cuerpoPara(m, sinPensar), restante());
       } catch (err) {
-        if (!(sinPensar && err.status === 400 && /thinking/i.test(err.detalle || ''))) throw err;
+        if (!(sinPensar && err.status === 400)) throw err;
         return post(url(m), { 'x-goog-api-key': key }, cuerpoPara(m, false), restante());
       }
     }
