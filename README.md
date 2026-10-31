@@ -37,8 +37,12 @@ Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 
 - El trabajo está **a la vista todo el tiempo**. Carlos señala la parte de la que habla y, al final, el reporte es **el mismo trabajo marcado** en verde, amarillo o rojo según lo que el estudiante pudo explicar.
 
 ### Cómo llega la tarea al estudiante
-1. El **profesor** crea la tarea (curso, título, qué deben poder explicar, instrucciones y teoría del curso de hasta 5 archivos cada una, y cierre) y recibe un **código** tipo `KXS-3NT` y un **token privado** para ver los reportes.
-2. Elige de dónde sale el trabajo: **cada estudiante sube el suyo** o **toda la clase defiende un trabajo base**.
+1. El **profesor** crea la tarea: curso, título, qué deben poder explicar, **tipo de actividad** y **fecha límite** (obligatorios, con calendario). Recibe un **código** tipo `KXS-3NT` y un **token privado** para ver los reportes.
+   - **Evaluación calificada:** al vencer la fecha límite nadie puede empezar a entregar. Quien ya había empezado puede terminar, y su entrega queda marcada *fuera de plazo* para que el profesor decida.
+   - **Práctica:** la fecha es de referencia. Se puede entregar después, pero la entrega queda marcada *fuera de plazo*.
+2. Elige qué defenderán sus estudiantes, y el formulario muestra solo la caja que corresponde:
+   - **Su propia tarea** (cada estudiante sube su resolución): una sola caja de **material** para guías, rúbricas, plantillas y teoría, hasta 10 archivos. El profesor indica qué es cada uno: las guías y plantillas le dicen a Carlos qué se pidió, y la teoría le da contexto del curso.
+   - **Un documento que el profesor les da** (una lectura, un caso): una caja para subir ese documento. Todos lo estudian y lo defienden; nadie sube nada.
 3. Comparte el código con la clase, o el enlace directo `…/?codigo=KXS-3NT`.
 4. El **estudiante** ingresa el código, lee las instrucciones y la teoría, escribe su nombre y elige el modo. Si la tarea lo pide, sube su resolución en `.pdf` o `.docx` (hasta 10 MB) o pega su texto.
 
@@ -227,7 +231,7 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 - **No hay cuentas**: cualquiera con el código entra a la tarea, y el estudiante se identifica solo con su nombre. Por eso, el límite de una entrega se puede evadir escribiendo otro nombre, y el profesor no ve quién falta si no compara con su lista.
 - **Salir a mitad de una entrega sí gasta el intento**: se entrega lo respondido. Solo un intento sin ninguna respuesta se puede volver a empezar.
 - **Las dudas nuevas solo aplican a trabajos subidos por el estudiante**: en un trabajo base común, ensayo y entrega usan las mismas.
-- **El cierre es manual**: el profesor cierra las entregas desde su panel. El campo *cierre* es solo informativo y no bloquea nada por fecha.
+- **La fecha límite se interpreta en la hora del navegador del profesor** y se muestra a cada estudiante en su propia hora local. Además de la fecha, el profesor puede cerrar o reabrir las entregas a mano desde su panel.
 - **Un punto evaluado sin conexión no cuenta**: si el navegador no logra hablar con el servidor, el punto queda en rojo y marcado como “sin registro” para que el profesor lo revise.
 - **El token del profesor se muestra una sola vez** y no se puede recuperar.
 - **Los límites globales son por minuto, no un presupuesto mensual**: protegen contra ráfagas, pero no reemplazan un tope de gasto en la consola del proveedor de IA ni la cuota de Upstash.
@@ -316,7 +320,7 @@ Crea un bucket privado en [Supabase](https://supabase.com) con límite de 10 MB 
 3. Despliega. El frontend se sirve desde `public/` y los endpoints quedan en `/api/`.
 
 ### Agregar un caso base
-Crea `modulos/casos/datos/<id>.json` con la misma estructura de `demo.json` (fragmentos del trabajo y puntos con `fragmento`, `apertura`, `error_de_carlos` y `que_debe_explicar`) y agrégalo a `modulos/casos/datos/index.json` para que el profesor pueda elegirlo al crear la tarea.
+Crea `modulos/casos/datos/<id>.json` con la misma estructura de `demo.json` (fragmentos del trabajo y puntos con `fragmento`, `apertura`, `error_de_carlos` y `que_debe_explicar`) y agrégalo a `modulos/casos/datos/index.json`. El formulario del profesor ya no ofrece casos base: se usan por API (`casoId`) o para `DEMO-01`.
 
 ---
 

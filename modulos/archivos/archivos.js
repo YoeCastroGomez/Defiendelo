@@ -4,7 +4,7 @@ import { archivosConfigurado, crearEnlaceSubida, crearEnlaceDescarga } from '../
 import { listar } from '../../compartido/almacen.js';
 import { errorHttp } from '../../compartido/http.js';
 import { cargarCaso } from '../casos/casos.js';
-import { archivosDeInstrucciones, obtenerTareaInterna, verificarTokenProfesor } from '../tareas/tareas.js';
+import { archivosDeInstrucciones, obtenerTareaInterna, verificarTokenProfesor, noRecibeEntregas } from '../tareas/tareas.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 // enunciado: instrucciones o teoría del profesor. base: trabajo común que sube el profesor.
@@ -22,7 +22,7 @@ export async function prepararSubida({ tipo, nombre, tamano, codigo } = {}) {
     const tarea = codigo ? await obtenerTareaInterna(codigo) : null;
     if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
     if (tarea.casoId !== 'estudiante') throw errorHttp('Esta tarea no recibe archivos de los estudiantes', 400);
-    if (tarea.cerrada) throw errorHttp('Esta tarea está cerrada: ya no recibe entregas', 403);
+    if (noRecibeEntregas(tarea)) throw errorHttp('Esta tarea ya no recibe entregas (cerrada o con el plazo vencido)', 403);
   }
   const extension = /\.(pdf|docx)$/i.exec(String(nombre || ''))?.[1]?.toLowerCase();
   if (!extension) throw errorHttp('Formato no compatible. Sube un archivo .pdf o .docx', 400);

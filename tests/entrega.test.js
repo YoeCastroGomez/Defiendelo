@@ -2,6 +2,9 @@
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
+// Toda tarea nueva necesita tipo de actividad y fecha límite.
+const PLAZO = { tipoActividad: 'evaluacion', fechaLimite: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() };
+
 for (const v of ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'SUPABASE_URL']) delete process.env[v];
 
 const { default: apiTareas } = await import('../api/tareas.js');
@@ -24,7 +27,7 @@ async function llamar(handler, { method = 'GET', query = {}, body, headers = {} 
   return salida;
 }
 
-const nuevaTarea = async () => (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'demo' } })).json;
+const nuevaTarea = async () => (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'demo' } })).json;
 const abrir = (codigo, nombre) => llamar(apiIntentos, { method: 'POST', body: { codigo, nombre } });
 async function entregar(codigo, nombre) {
   const a = await abrir(codigo, nombre);

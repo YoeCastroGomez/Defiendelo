@@ -154,6 +154,14 @@ function pintarDoc(cont, opts) {
 }
 
 /* ---------- entrada, código y profesor ---------- */
+// Fecha límite legible en la hora local de quien mira: "vie, 7 nov, 23:59".
+function formatoFecha(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('es-PE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+const ETIQUETA_ACTIVIDAD = { evaluacion: 'evaluación calificada', practica: 'práctica' };
+const plazoVencido = (t) => !!t.fechaLimite && Date.now() > Date.parse(t.fechaLimite);
 // DEMO-01 tiene otro formato que los códigos normales (ABC-DEF): "demo01" no debe volverse "DEM-O01".
 const normCodigo = (c) => {
   c = (c || '').toUpperCase().replace(/[\s_]/g, '');
@@ -196,7 +204,9 @@ async function entrarConCodigo(e) {
     $('codigo-err').textContent = err.message; mostrar('rol'); return;
   }
   const t = S.tarea;
-  $('i-curso').textContent = t.curso + (t.profesor ? ' · ' + t.profesor : '') + (t.cierre ? ' · cierra ' + t.cierre : '');
+  $('i-curso').textContent = t.curso + (t.profesor ? ' · ' + t.profesor : '') + (t.tipoActividad ? ' · ' + ETIQUETA_ACTIVIDAD[t.tipoActividad] : '');
+  $('i-plazo').textContent = t.fechaLimite ? (plazoVencido(t) ? 'Venció el ' : 'Fecha límite: ') + formatoFecha(t.fechaLimite) : '';
+  $('i-plazo').classList.toggle('vencido', plazoVencido(t));
   $('i-titulo').textContent = t.titulo;
   $('i-crit').textContent = t.criterios || '';
   $('i-crit-caja').classList.toggle('oculto', !t.criterios);
@@ -208,23 +218,23 @@ async function entrarConCodigo(e) {
   $('i-codigo').textContent = t.codigo;
   $('i-tarea').textContent = S.caso ? S.caso.documento.titulo : 'Aún no subes tu resolución';
   $('i-prov').textContent = S.caso?.provisional ? 'caso de ejemplo provisional' : '';
-  // Una tarea cerrada ya no recibe entregas, pero se puede seguir ensayando.
+  // Una tarea cerrada, o una evaluación con el plazo vencido, ya no recibe entregas; se puede seguir ensayando.
+  // En una práctica vencida sí se puede entregar, pero llega fuera de plazo.
+  const vencida = plazoVencido(t);
+  const sinEntregas = !!t.cerrada || (t.tipoActividad === 'evaluacion' && vencida);
   const entregar = document.querySelector('input[name=modo][value=evaluacion]');
-  entregar.disabled = !!t.cerrada;
-  if (t.cerrada) document.querySelector('input[name=modo][value=practica]').checked = true;
-  $('op-entregar').classList.toggle('deshabilitada', !!t.cerrada);
-  $('op-entregar-txt').textContent = t.cerrada ? 'El profesor cerró esta tarea: ya no recibe entregas. Todavía puedes ensayar.' : 'Tu profesor recibe el reporte. Tienes un solo intento: si sales a mitad, se entrega lo que llevas. Carlos trae dudas nuevas.';
+  entregar.disabled = sinEntregas;
+  if (sinEntregas) document.querySelector('input[name=modo][value=practica]').checked = true;
+  $('op-entregar').classList.toggle('deshabilitada', sinEntregas);
+  $('op-entregar-txt').textContent = t.cerrada ? 'El profesor cerró esta tarea: ya no recibe entregas. Todavía puedes ensayar.'
+    : sinEntregas ? 'El plazo de esta evaluación ya venció: ya no recibe entregas. Todavía puedes ensayar.'
+      : vencida ? 'La fecha de referencia ya pasó: puedes entregar, pero tu entrega llegará fuera de plazo. Tienes un solo intento.'
+        : 'Tu profesor recibe el reporte. Tienes un solo intento: si sales a mitad, se entrega lo que llevas. Carlos trae dudas nuevas.';
   window.dispatchEvent(new CustomEvent('defiendelo:inicio', { detail: t }));
   mostrar('inicio');
 }
 
 async function abrirProfe() {
-  if (!$('t-caso').options.length) {
-    try {
-      const lista = await (await fetch('api/casos')).json();
-      lista.forEach((c) => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.titulo; $('t-caso').appendChild(o); });
-    } catch { /* sin lista: queda vacío y el servidor usa demo */ }
-  }
   $('creada').classList.add('oculto');
   mostrar('profe');
 }
@@ -235,11 +245,14 @@ async function crearTarea(e) {
   try {
     const r = await fetch('api/tareas', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ titulo: $('t-titulo').value, curso: $('t-curso').value, profesor: $('t-prof').value, criterios: $('t-crit').value, cierre: $('t-cierre').value, casoId: $('t-caso').value, llaveCaso: $('t-caso').selectedOptions[0]?.dataset.llave || '', ...(window.enunciadoTarea ? window.enunciadoTarea() : {}) }),
+      // datosPlazoTarea y datosOrigenTarea (js/subir.js) lanzan un error con un mensaje claro si falta algo.
+      body: JSON.stringify({ titulo: $('t-titulo').value, curso: $('t-curso').value, profesor: $('t-prof').value, criterios: $('t-crit').value, ...window.datosPlazoTarea(), ...window.datosOrigenTarea() }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'No se pudo crear la tarea');
     $('c-codigo').textContent = d.codigo;
+    const plazo = window.datosPlazoTarea();
+    $('c-resumen').textContent = `${ETIQUETA_ACTIVIDAD[plazo.tipoActividad]} · fecha límite: ${formatoFecha(plazo.fechaLimite)}`;
     $('c-aviso').textContent = d.persistente ? 'El código queda activo 60 días.' : 'Sin base de datos conectada: el código dura mientras el servidor siga encendido.';
     if (window.mostrarTokenCreado) window.mostrarTokenCreado(d);
     $('creada').classList.remove('oculto');

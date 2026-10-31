@@ -57,7 +57,7 @@ fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .dos-col{display:flex;flex-wrap:wrap;gap:14px}
 .entre{justify-content:space-between}
 .inicio-form{display:flex;flex-direction:column;gap:16px}
-input[type=text],select,textarea.claro{width:100%;padding:11px 12px;border:1px solid #CFCFCA;border-radius:8px;font:inherit;background:#fff;color:var(--tinta)}
+input[type=text],input[type=datetime-local],select,textarea.claro{width:100%;padding:11px 12px;border:1px solid #CFCFCA;border-radius:8px;font:inherit;background:#fff;color:var(--tinta)}
 textarea.claro{resize:vertical}
 .codigo{font-family:var(--mono);font-size:22px;letter-spacing:3px;text-transform:uppercase;text-align:center}
 .error{color:var(--rojo);font-size:13.5px;min-height:1.2em}
@@ -208,3 +208,9 @@ details.dialogo-limpio summary{font-family:var(--mono);font-size:12px;color:var(
 .enunciado summary{padding:12px 14px;font-weight:500;cursor:pointer}
 #i-enunciado,.texto-material{max-height:340px;overflow:auto;padding:0 14px 14px;white-space:pre-wrap;font-size:14.5px}
 .enunciado-bajar{margin:0 14px 14px}
+/* Formulario del profesor: botones rápidos de fecha y aviso de plazo vencido */
+.chico-btn{min-height:38px;padding:0 12px;font-size:13px}
+#i-plazo{margin-top:2px}
+#i-plazo.vencido{color:var(--rojo,#B3261E)}
+.dos-col>.opcion{flex:1 1 220px;min-width:0}
+fieldset{min-width:0}
