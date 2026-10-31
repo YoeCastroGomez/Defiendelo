@@ -174,7 +174,7 @@ async function entrarConCodigo(e) {
     if (S.casoId === 'estudiante') {
       S.caso = null;
     } else {
-      const rc = await fetch(`casos/${S.casoId}.json`);
+      const rc = await fetch('api/casos?id=' + encodeURIComponent(S.casoId));
       if (!rc.ok) throw new Error('No se pudo cargar el trabajo');
       S.caso = await rc.json();
     }
@@ -196,7 +196,7 @@ async function entrarConCodigo(e) {
 async function abrirProfe() {
   if (!$('t-caso').options.length) {
     try {
-      const lista = await (await fetch('casos/index.json')).json();
+      const lista = await (await fetch('api/casos')).json();
       lista.forEach((c) => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.titulo; $('t-caso').appendChild(o); });
     } catch { /* sin lista: queda vacío y el servidor usa demo */ }
   }
