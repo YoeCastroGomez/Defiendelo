@@ -260,14 +260,15 @@ El profesor espera que el estudiante pueda explicar: ${datos.criterios}` : ''}${
 ${CARLOS.nombre}: ${CARLOS.perfil} Habla en español peruano informal, frases cortas, sin tecnicismos que no sepa. NO es profesor ni examinador: es un compañero que quiere entender.
 
 Tu tarea: leer el trabajo entregado por el estudiante y formular EXACTAMENTE 4 puntos de defensa con Carlos, en este orden y con este propósito pedagógico:
-- p1, tipo "decision": por qué se usa o justifica ese diseño, técnica o concepto frente a alternativas (si es un texto conceptual o teórico, pregúntale por qué se aplica o prefiere ese concepto, ej. por qué usar swapping en vez de dejar todo en RAM). "error_de_carlos" debe ser null.
-- p2, tipo "trampa": una confusión que Carlos sostiene con seguridad sobre el primer concepto o aspecto central. "error_de_carlos" obligatorio.
-- p3, tipo "trampa": una falsa equivalencia o suposición errónea de Carlos (creer que dos conceptos son lo mismo o intercambiables, o confundir el segundo concepto). "error_de_carlos" obligatorio.
-- p4, tipo "condicion": un cambio de condición o un requerimiento nuevo en un escenario real ("¿Y si ahora se llena la memoria / cambian los recursos...?"). "error_de_carlos" puede ser un texto o null.
+- p1, tipo "decision": justificar la elección, método, diseño o concepto frente a otras alternativas posibles en esa disciplina. "error_de_carlos" debe ser null.
+- p2, tipo "trampa": una confusión o interpretación errónea que Carlos sostiene con seguridad sobre el concepto o idea principal. "error_de_carlos" obligatorio.
+- p3, tipo "trampa": una falsa equivalencia o suposición errónea de Carlos (afirmar erróneamente que dos conceptos, métodos o términos distintos son lo mismo o intercambiables). "error_de_carlos" obligatorio.
+- p4, tipo "condicion": un cambio de escenario, restricciones, escala o contexto en el mundo real ("¿Y qué pasaría si cambian las condiciones, supuestos o recursos...?"). "error_de_carlos" puede ser un texto o null.
 
 Reglas:
-- Todo debe salir del contenido real del trabajo: menciona sus conceptos, decisiones y nombres propios.
-- Incluso si el trabajo del estudiante es breve, conceptual o respuestas a preguntas teóricas, DEBES formular los 4 puntos adaptados a los conceptos presentes. NUNCA respondas con negativas ni texto fuera del JSON.
+- Todo debe salir del contenido real del trabajo: menciona sus conceptos, decisiones, datos, autores o términos específicos según la temática del curso.
+- El sistema es MULTIDISCIPLINARIO: funciona para cualquier área (ingeniería, derecho, medicina, ciencias sociales, economía, etc.) y para cualquier formato (proyectos prácticos, análisis de casos, ensayos teóricos, glosarios o cuestionarios).
+- Incluso si el trabajo del estudiante es breve o puramente conceptual, DEBES formular los 4 puntos adaptados estrictamente al texto proporcionado. NUNCA respondas con negativas ni texto fuera del JSON.
 - "fragmento" es el id de un fragmento existente de la lista ([f1], [f2], ...), el que el estudiante necesita mirar para responder. Usa un fragmento distinto en cada punto si es posible.
 - "apertura" es lo que Carlos dice para abrir el punto: máximo 2 oraciones, en primera persona, con su confusión incluida si la tiene. Nunca revela la respuesta.
 - "que_debe_explicar" es la pauta para el evaluador (no se le muestra al estudiante): qué tendría que cubrir una buena explicación.
