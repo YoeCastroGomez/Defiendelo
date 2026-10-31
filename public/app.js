@@ -102,10 +102,10 @@ function toggleMic() {
     $('resp').value = base + fin + tmp;
     actualizarBorrar();
   };
-  rec.onend = () => { grabando = false; $('b-mic').textContent = '● Hablar'; $('b-mic').classList.remove('grabando'); if ($('d-aviso').textContent === ESCUCHANDO) $('d-aviso').textContent = ''; };
+  rec.onend = () => { grabando = false; $('b-mic').textContent = 'Hablar'; $('b-mic').classList.remove('grabando'); if ($('d-aviso').textContent === ESCUCHANDO) $('d-aviso').textContent = ''; };
   rec.onerror = (e) => { $('d-aviso').textContent = ERRORES_MIC[e.error] || 'No se pudo usar el micrófono. Puedes escribir tu respuesta.'; };
   rec.start();
-  grabando = true; $('b-mic').textContent = '■ Detener'; $('b-mic').classList.add('grabando');
+  grabando = true; $('b-mic').textContent = 'Detener'; $('b-mic').classList.add('grabando');
   $('d-aviso').textContent = ESCUCHANDO;
 }
 // Al enviar se deja de transcribir: una frase que llegue tarde no debe caer en la respuesta del siguiente punto.
@@ -280,8 +280,8 @@ async function crearTarea(e) {
 
 async function copiar(texto, boton) {
   const antes = boton.textContent;
-  try { await navigator.clipboard.writeText(texto); boton.textContent = 'Copiado'; } catch { boton.textContent = 'Cópialo a mano'; }
-  setTimeout(() => { boton.textContent = antes; }, 1600);
+  try { await navigator.clipboard.writeText(texto); boton.textContent = 'Copiado'; boton.classList.add('copiado'); } catch { boton.textContent = 'Cópialo a mano'; }
+  setTimeout(() => { boton.textContent = antes; boton.classList.remove('copiado'); }, 1600);
 }
 
 // Abre la entrega en el servidor. Ahí quedan registradas las evaluaciones de Carlos, y con ellas se

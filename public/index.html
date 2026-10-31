@@ -23,18 +23,18 @@
     </div>
     <div class="inicio-form">
       <form class="tarjeta pila" id="f-codigo">
-        <label class="etq" for="codigo">Soy estudiante</label>
+        <label class="etq etq-rol" for="codigo"><span class="ico-caja" data-icono="estudiante" aria-hidden="true"></span>Soy estudiante</label>
         <p class="suave chico">Ingresa el código que te dio tu profesor.</p>
         <input id="codigo" class="codigo" type="text" autocomplete="off" spellcheck="false" placeholder="ABC-123" maxlength="12" required>
         <p class="error" id="codigo-err" role="alert"></p>
-        <button class="btn" type="submit">Entrar</button>
+        <button class="btn" type="submit" data-flecha>Entrar</button>
       </form>
       <div class="tarjeta pila">
-        <p class="etq">Soy profesor</p>
+        <p class="etq etq-rol"><span class="ico-caja" data-icono="profesor" aria-hidden="true"></span>Soy profesor</p>
         <p class="suave chico">Crea una defensa para tu clase o consulta los reportes recibidos.</p>
         <div class="fila">
-          <button class="btn claro" type="button" id="b-ir-profe">Crear tarea</button>
-          <button class="btn claro" type="button" id="b-ir-panel">Ver reportes</button>
+          <button class="btn" type="button" id="b-ir-profe" data-icono="nueva">Crear tarea</button>
+          <button class="btn claro" type="button" id="b-ir-panel" data-icono="reportes">Ver reportes</button>
         </div>
       </div>
     </div>
@@ -44,8 +44,8 @@
 <!-- ============ PROFESOR: CREAR TAREA ============ -->
 <section class="pantalla" id="profe">
   <header class="top">
-    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">← Volver</button></div>
-    <span class="mono suave">profesor</span>
+    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">Volver</button></div>
+    <span class="rol-etq" data-icono="profesor">profesor</span>
   </header>
   <main class="solo">
     <h1 class="titulo">Nueva defensa</h1>
@@ -96,7 +96,7 @@
         <div id="caja-base-prof"></div></div>
 
       <p class="error" id="tarea-err" role="alert"></p>
-      <button class="btn" type="submit" id="b-crear">Generar código</button>
+      <button class="btn" type="submit" id="b-crear" data-flecha>Generar código</button>
     </form>
 
     <div class="tarjeta oscura pila oculto" id="creada" aria-live="polite">
@@ -109,11 +109,11 @@
         <code class="mono" id="c-token" style="font-size:13.5px;color:var(--amarillo);word-break:break-all"></code>
       </div>
       <div class="fila">
-        <button class="btn amarillo" type="button" id="b-copiar">Copiar código</button>
-        <button class="btn claro" type="button" id="b-copiar-link">Copiar enlace</button>
-        <button class="btn claro oculto" type="button" id="b-copiar-token">Copiar llave</button>
-        <button class="btn claro oculto" type="button" id="b-ver-reportes-creada">Ver reportes</button>
-        <button class="btn fantasma" type="button" id="b-probar">Probar como estudiante</button>
+        <button class="btn amarillo" type="button" id="b-copiar" data-icono="copiar">Copiar código</button>
+        <button class="btn claro" type="button" id="b-copiar-link" data-icono="enlace">Copiar enlace</button>
+        <button class="btn claro oculto" type="button" id="b-copiar-token" data-icono="llave">Copiar llave</button>
+        <button class="btn claro oculto" type="button" id="b-ver-reportes-creada" data-icono="reportes">Ver reportes</button>
+        <button class="btn fantasma" type="button" id="b-probar" data-icono="probar">Probar como estudiante</button>
       </div>
     </div>
   </main>
@@ -122,7 +122,7 @@
 <!-- ============ ESTUDIANTE: TAREA ============ -->
 <section class="pantalla" id="inicio">
   <header class="top">
-    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">← Cambiar código</button></div>
+    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">Cambiar código</button></div>
     <span class="mono suave estado-ia">comprobando IA…</span>
   </header>
   <main class="inicio">
@@ -158,7 +158,7 @@
       </fieldset>
 
       <p class="chico suave">Puedes haber usado IA para hacer tu trabajo; aquí importa que lo entiendas. Tu trabajo estará a la vista todo el tiempo.</p>
-      <button class="btn" id="b-empezar" type="button">Empezar con Carlos</button>
+      <button class="btn" id="b-empezar" type="button" data-flecha>Empezar con Carlos</button>
     </div>
   </main>
 </section>
@@ -166,7 +166,7 @@
 <!-- ============ DEFENSA ============ -->
 <section class="pantalla" id="defensa">
   <header class="top">
-    <div class="top-izq"><span class="marca">defiéndelo<span class="cur">_</span></span><button class="volver" type="button" id="b-salir">← Salir</button></div>
+    <div class="top-izq"><span class="marca">defiéndelo<span class="cur">_</span></span><button class="volver salir" type="button" id="b-salir" data-icono="salir">Salir</button></div>
     <ol class="progreso" id="progreso" aria-label="Puntos"></ol>
     <span class="mono suave"><span id="d-modo"></span> · <span id="reloj">00:00</span></span>
   </header>
@@ -214,14 +214,14 @@
         <textarea id="resp" rows="5" placeholder="Habla o escribe con tus palabras…"></textarea>
         <p class="mono chico osc-suave" id="d-aviso"></p>
         <div class="fila" id="d-controles">
-          <button class="btn claro" id="b-mic" type="button">● Hablar</button>
-          <button class="btn amarillo" id="b-enviar" type="button">Responder</button>
+          <button class="btn claro" id="b-mic" type="button" data-icono="mic">Hablar</button>
+          <button class="btn amarillo" id="b-enviar" type="button" data-icono="enviar">Responder</button>
           <button class="btn fantasma" id="b-nose" type="button">No sé</button>
           <button class="btn fantasma oculto" id="b-borrar" type="button">Borrar y volver a hablar</button>
           <button class="btn fantasma" id="b-cambiar" type="button">Prefiero escribir</button>
           <button class="btn fantasma" id="b-sim" type="button">Simular respuesta</button>
         </div>
-        <button class="btn amarillo oculto" id="b-sig" type="button">Siguiente</button>
+        <button class="btn amarillo oculto" id="b-sig" type="button" data-flecha>Siguiente</button>
       </div>
       <label class="voz mono chico"><input type="checkbox" id="c-voz" checked> voz de Carlos</label>
     </section>
@@ -231,7 +231,7 @@
 <!-- ============ REPORTE ============ -->
 <section class="pantalla" id="reporte">
   <header class="top">
-    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">← Inicio</button></div>
+    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol" data-icono="inicio">Inicio</button></div>
     <span class="mono suave" id="r-meta"></span>
   </header>
   <main class="reporte">
@@ -261,10 +261,10 @@
 <!-- ============ PROFESOR: PANEL DE REPORTES ============ -->
 <section class="pantalla" id="panel-profe">
   <header class="top">
-    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">← Volver</button></div>
+    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">Volver</button></div>
     <div class="fila">
-      <button class="btn claro" type="button" id="b-panel-nueva">Nueva tarea</button>
-      <span class="mono suave">panel docente</span>
+      <button class="btn claro" type="button" id="b-panel-nueva" data-icono="nueva">Nueva tarea</button>
+      <span class="rol-etq" data-icono="profesor">panel docente</span>
     </div>
   </header>
   <main class="panel-wrap">
@@ -274,7 +274,7 @@
           <h1 class="titulo" style="font-size:clamp(22px,2.6vw,28px)">Reportes de la clase</h1>
           <p class="suave chico">Revisa el dominio por punto, el documento marcado y la evidencia de cada estudiante.</p>
         </div>
-        <button class="btn claro oculto" type="button" id="b-exportar-csv">Exportar CSV</button>
+        <button class="btn claro oculto" type="button" id="b-exportar-csv" data-icono="tabla">Exportar CSV</button>
       </div>
       <div class="dos-col">
         <div class="pila-c">
@@ -289,8 +289,8 @@
       <div class="fila entre">
         <p class="error" id="panel-err" role="alert" style="margin:0"></p>
         <div class="fila">
-          <button class="btn claro oculto" type="button" id="b-refrescar-panel">Actualizar</button>
-          <button class="btn" type="submit" id="b-consultar-panel">Ver entregas</button>
+          <button class="btn claro oculto" type="button" id="b-refrescar-panel" data-icono="actualizar">Actualizar</button>
+          <button class="btn" type="submit" id="b-consultar-panel" data-flecha>Ver entregas</button>
         </div>
       </div>
     </form>
@@ -304,7 +304,7 @@
         <div class="pila-c" style="align-items:flex-end;gap:6px">
           <span class="mono chico suave" id="p-info-foco"></span>
           <span class="mono chico suave" id="p-info-estado"></span>
-          <button class="btn claro" type="button" id="b-cerrar-tarea">Cerrar entregas</button>
+          <button class="btn claro peligro" type="button" id="b-cerrar-tarea" data-icono="candado">Cerrar entregas</button>
         </div>
       </div>
 
@@ -338,7 +338,7 @@
             <span class="chip" id="p-det-nivel"></span>
           </div>
           <h2 id="p-doc-titulo"></h2>
-          <button class="enlace-texto oculto" type="button" id="b-bajar-entrega">Descargar archivo original</button>
+          <button class="enlace-texto oculto" type="button" id="b-bajar-entrega" data-icono="descargar">Descargar archivo original</button>
           <div class="leyenda mono chico"><span class="ley verde">explicado</span><span class="ley amarillo">a medias</span><span class="ley rojo">no explicado</span><span class="ley neutro">no se tocó</span></div>
           <div id="p-doc-cuerpo"></div>
         </article>
