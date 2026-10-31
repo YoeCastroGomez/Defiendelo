@@ -289,23 +289,56 @@ function documentoParaPrompt(fragmentos) {
 }
 
 function extraerJSON(texto) {
-  const ini = String(texto || '').indexOf('{');
-  const fin = String(texto || '').lastIndexOf('}');
-  if (ini < 0 || fin < ini) throw new Error('la IA no devolvió JSON');
-  return JSON.parse(texto.slice(ini, fin + 1));
+  const str = String(texto || '').trim();
+  const sinMarkdown = str.replace(/^[\s\S]*?```(?:json)?\s*/i, '').replace(/\s*```[\s\S]*$/i, '').trim();
+
+  try { return JSON.parse(str); } catch {}
+  try { return JSON.parse(sinMarkdown); } catch {}
+
+  const pCorch = str.indexOf('[');
+  const uCorch = str.lastIndexOf(']');
+  const pLlave = str.indexOf('{');
+  const uLlave = str.lastIndexOf('}');
+
+  if (pCorch >= 0 && uCorch > pCorch && (pLlave < 0 || pCorch < pLlave)) {
+    try {
+      const arr = JSON.parse(str.slice(pCorch, uCorch + 1));
+      return { puntos: arr };
+    } catch {}
+  }
+
+  if (pLlave >= 0 && uLlave > pLlave) {
+    try {
+      return JSON.parse(str.slice(pLlave, uLlave + 1));
+    } catch {}
+  }
+
+  throw new Error('la IA no devolvió JSON');
 }
 
 const NIVELES = ['verde', 'amarillo', 'rojo'];
 
 // Normaliza lo que devolvió la IA y garantiza la estructura de los 4 puntos.
 function normalizarPuntos(crudos, fragmentos) {
-  if (!Array.isArray(crudos) || crudos.length < TIPOS.length) throw new Error('la IA no devolvió 4 puntos');
   const respaldo = puntosDeterministas(fragmentos);
+  let lista = [];
+  if (Array.isArray(crudos)) {
+    lista = crudos;
+  } else if (crudos && typeof crudos === 'object') {
+    if (Array.isArray(crudos.puntos)) lista = crudos.puntos;
+    else if (Array.isArray(crudos.items)) lista = crudos.items;
+    else if (Array.isArray(crudos.defensa)) lista = crudos.defensa;
+    else if (Array.isArray(crudos.preguntas)) lista = crudos.preguntas;
+    else lista = Object.values(crudos).filter((x) => x && typeof x === 'object');
+  }
+
+  if (!lista.length) throw new Error('la IA no devolvió 4 puntos');
+
   const usados = new Set();
   const asignados = [];
   const seccionDe = (id) => (fragmentos.find((f) => f.id === id) || {}).seccion;
   return TIPOS.map((tipo, i) => {
-    const c = crudos[i] && typeof crudos[i] === 'object' ? crudos[i] : {};
+    const c = (lista[i] && typeof lista[i] === 'object') ? lista[i] : {};
     const base = respaldo[i];
     const tema = recortar(c.tema, 60) || base.tema;
     const apertura = recortar(c.apertura, 300) || base.apertura;
@@ -423,7 +456,8 @@ export async function generarPuntos(datos, fragmentos) {
         { maxTokens: 3500 },
       );
       const d = extraerJSON(salida);
-      return { puntos: normalizarPuntos(d.puntos, fragmentos), titulo: recortar(d.titulo, 120), modoGeneracion: 'ia' };
+      const crudos = Array.isArray(d) ? d : (d?.puntos || d?.items || d?.defensa || d?.preguntas || d);
+      return { puntos: normalizarPuntos(crudos, fragmentos), titulo: recortar(d?.titulo, 120), modoGeneracion: 'ia' };
     } catch (e) {
       ultimo = e;
     }

@@ -204,8 +204,7 @@ Requisitos: **Node.js 18 o superior**. No hay dependencias que instalar.
 ```bash
 git clone https://github.com/YoeCastroGomez/Defiendelo.git
 cd Defiendelo
-cp .env.example .env     # opcional: sin .env funciona en modo simulado
-node server.js           # http://localhost:3000
+node server.js           # http://localhost:3000 (funciona en modo simulado sin .env)
 node --test              # pruebas, sin red ni .env
 ```
 

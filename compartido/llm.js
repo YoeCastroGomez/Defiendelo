@@ -35,14 +35,32 @@ export async function llamarLLM(sistema, mensajes, opciones = {}) {
   }
 
   if (p === 'gemini') {
-    const d = await post(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-      { 'x-goog-api-key': key },
-      {
-        systemInstruction: { parts: [{ text: sistema }] },
-        contents: mensajes.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-        generationConfig: { temperature: 0.4, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
-      });
-    return d.candidates[0].content.parts.map((x) => x.text || '').join('');
+    let modelo = (model || '').trim().replace(/^models\//, '');
+    if (modelo.includes('2.5')) modelo = 'gemini-1.5-flash';
+    const cuerpoGemini = {
+      systemInstruction: { parts: [{ text: sistema }] },
+      contents: mensajes.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+      generationConfig: { temperature: 0.4, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
+    };
+    let d;
+    try {
+      d = await post(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent`,
+        { 'x-goog-api-key': key },
+        cuerpoGemini);
+    } catch (err) {
+      if (err.message && err.message.includes('404') && modelo !== 'gemini-1.5-flash') {
+        d = await post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+          { 'x-goog-api-key': key },
+          cuerpoGemini);
+      } else {
+        throw err;
+      }
+    }
+    const cand = d?.candidates?.[0];
+    if (!cand?.content?.parts) {
+      throw new Error(`Gemini no generó contenido (finishReason: ${cand?.finishReason || 'desconocido'})`);
+    }
+    return cand.content.parts.map((x) => x.text || '').join('');
   }
 
   const bases = {

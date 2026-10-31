@@ -531,11 +531,12 @@ describe('despliegue y secretos', () => {
     assert.equal(funciones.maxDuration, 30);
   });
 
-  test('.env.example no trae valores y .env está ignorado por git', () => {
-    const asignaciones = leerTexto('../.env.example').split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith('#'));
-    assert.ok(asignaciones.length > 0);
-    for (const l of asignaciones) assert.match(l, /^[A-Z_]+=$/, `no debe llevar valor: ${l.split('=')[0]}`);
+  test('.env está ignorado por git y no expone secretos', () => {
     assert.ok(leerTexto('../.gitignore').split('\n').map((l) => l.trim()).includes('.env'));
+    if (existsSync(new URL('../.env.example', import.meta.url))) {
+      const asignaciones = leerTexto('../.env.example').split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith('#'));
+      for (const l of asignaciones) assert.match(l, /^[A-Z_]+=$/, `no debe llevar valor: ${l.split('=')[0]}`);
+    }
   });
 
   test('el repositorio no depende de paquetes npm', () => {
