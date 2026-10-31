@@ -41,7 +41,8 @@
       + (Number(senales.pegadoBloqueado) || 0)
       + (Number(senales.captura) || 0)
       + (senales.iaCaida ? 1 : 0)
-      + (Number(senales.sinRegistro) || 0);
+      + (Number(senales.sinRegistro) || 0)
+      + (senales.abandonada ? 1 : 0);
   }
 
   function formatearDuracion(seg) {
@@ -390,6 +391,7 @@
     if (s.pegadoBloqueado) alertas.push(`${s.pegadoBloqueado} intento(s) de pegar texto`);
     if (s.captura) alertas.push(`${s.captura} intento(s) de captura o impresión`);
     if (s.iaCaida) alertas.push('evaluada parcialmente en modo respaldo');
+    if (s.abandonada) alertas.push('salió a mitad de la entrega: se cerró con lo que alcanzó a responder');
     if (s.sinRegistro) alertas.push(`${s.sinRegistro} punto(s) sin evaluación registrada en el servidor (cuentan como rojo)`);
 
     if (alertas.length) {
@@ -567,7 +569,12 @@
 
   function exportarCSV() {
     if (!estadoPanel.tarea || !estadoPanel.sesiones.length) return;
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    // Una celda que empieza con = + - @ (o tabulador/retorno) Excel la ejecuta como fórmula: se le antepone
+    // un apóstrofo para que quede como texto. Un estudiante podría llamarse "=HYPERLINK(...)".
+    const esc = (v) => {
+      const t = String(v ?? '');
+      return `"${(/^[=+\-@\t\r]/.test(t) ? "'" + t : t).replace(/"/g, '""')}"`;
+    };
     const cab = ['Estudiante', 'Nivel sugerido', 'Duracion (s)', 'Puntos verdes', 'Total puntos', 'Alertas totales', 'Leyo literal', 'Dubitativo', 'Salidas pestana', 'Pegado bloqueado', 'Capturas', 'Fecha ISO'];
     const filas = estadoPanel.sesiones.map((s) => {
       const pts = Object.values(s.resultados || {});

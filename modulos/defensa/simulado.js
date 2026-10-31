@@ -10,7 +10,7 @@ const REACCION = {
 };
 const ESTADO = { verde: 'convencido', amarillo: 'confundido', rojo: 'ironico' };
 
-export function evaluacionSimulada(punto, texto, { leyo = false, dubitativo = false } = {}) {
+export function evaluacionSimulada(punto, texto, { leyo = false, dubitativo = false, usarEjemplo = true } = {}) {
   const t = String(texto || '').trim();
   const s = punto.simulado;
   if (!t || t === 'No sé.' || t === '(silencio)') {
@@ -19,7 +19,7 @@ export function evaluacionSimulada(punto, texto, { leyo = false, dubitativo = fa
   if (leyo) {
     return { nivel: 'amarillo', estado_carlos: 'ironico', motivo: 'Leyó su trabajo casi palabra por palabra, sin explicarlo.', evidencia: corta(t, 120), repreguntar: false, carlos_dice: 'Ya, bacán, me leíste el párrafo igualito… pero yo quería que me lo traduzcas en cristiano. Sigamos.' };
   }
-  if (s && t === String(s.respuesta || '').trim() && ['verde', 'amarillo', 'rojo'].includes(s.nivel)) {
+  if (usarEjemplo && s && t === String(s.respuesta || '').trim() && ['verde', 'amarillo', 'rojo'].includes(s.nivel)) {
     const dice = s.nivel === 'amarillo' && dubitativo ? REACCION.amarilloDuda : REACCION[s.nivel];
     return { nivel: s.nivel, estado_carlos: ESTADO[s.nivel], motivo: String(s.motivo || ''), evidencia: corta(t, 120), repreguntar: false, carlos_dice: dice };
   }

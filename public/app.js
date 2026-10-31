@@ -211,7 +211,7 @@ async function entrarConCodigo(e) {
   entregar.disabled = !!t.cerrada;
   if (t.cerrada) document.querySelector('input[name=modo][value=practica]').checked = true;
   $('op-entregar').classList.toggle('deshabilitada', !!t.cerrada);
-  $('op-entregar-txt').textContent = t.cerrada ? 'El profesor cerró esta tarea: ya no recibe entregas. Todavía puedes ensayar.' : 'Tu profesor recibe el reporte. Tienes un solo intento y Carlos trae dudas nuevas.';
+  $('op-entregar-txt').textContent = t.cerrada ? 'El profesor cerró esta tarea: ya no recibe entregas. Todavía puedes ensayar.' : 'Tu profesor recibe el reporte. Tienes un solo intento: si sales a mitad, se entrega lo que llevas. Carlos trae dudas nuevas.';
   window.dispatchEvent(new CustomEvent('defiendelo:inicio', { detail: t }));
   mostrar('inicio');
 }
@@ -530,13 +530,27 @@ $('b-cambiar').onclick = () => {
   aplicarModoRespuesta();
   if (S.respuesta === 'texto') $('resp').focus();
 };
-$('b-salir').onclick = () => {
-  const aviso = S.modo === 'evaluacion' ? '¿Salir de la entrega? Tu avance se pierde y el profesor no recibirá ningún reporte.' : '¿Salir del ensayo? Tu avance se pierde.';
+// Solo hay un intento: salir de una entrega con respuestas la entrega con lo que se respondió.
+const entregaEnCurso = () => S.modo === 'evaluacion' && S.intento && $('defensa').classList.contains('on') && Object.keys(S.resultados).length > 0;
+$('b-salir').onclick = async () => {
+  const aviso = S.modo !== 'evaluacion' ? '¿Salir del ensayo? Tu avance se pierde.'
+    : Object.keys(S.resultados).length ? '¿Salir de la entrega? Solo tienes un intento: tu profesor recibirá lo que llevas respondido y no podrás volver a empezar.'
+      : '¿Salir de la entrega? Aún no respondiste nada, así que podrás empezarla de nuevo.';
   if (!window.confirm(aviso)) return;
   detenerMic();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (entregaEnCurso()) {
+    try {
+      await fetch('api/sesiones', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ modo: 'evaluacion', intento: S.intento, abandonada: true, senales: { pantallaOculta: S.senales.pantallaOculta, pegadoBloqueado: S.senales.pegadoBloqueado, captura: S.senales.captura } }),
+      });
+    } catch { /* si no se pudo enviar, el servidor la cierra sola al rato o al volver a empezar */ }
+  }
   mostrar('inicio');
 };
+// Cerrar la pestaña a mitad de una entrega también gasta el intento: se avisa antes.
+window.addEventListener('beforeunload', (e) => { if (entregaEnCurso()) { e.preventDefault(); e.returnValue = ''; } });
 if (!SR) {
   document.querySelector('input[name=respuesta][value=voz]').disabled = true;
   document.querySelector('input[name=respuesta][value=texto]').checked = true;

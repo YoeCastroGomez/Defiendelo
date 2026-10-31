@@ -58,6 +58,14 @@ export async function agregar(clave, valor) {
   return arr.length;
 }
 
+// Deja solo los últimos `max` elementos de una lista (para listas que no deben crecer sin fin).
+export async function recortarLista(clave, max) {
+  if (persistente()) return redis(['LTRIM', clave, String(-max), '-1']);
+  const arr = listas.get(clave);
+  if (arr && arr.length > max) listas.set(clave, arr.slice(-max));
+  return 'OK';
+}
+
 export async function listar(clave) {
   if (persistente()) {
     const arr = await redis(['LRANGE', clave, '0', '-1']);

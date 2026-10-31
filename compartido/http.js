@@ -26,16 +26,50 @@ export function cabecera(req, nombre) {
   return Array.isArray(h) ? String(h[0] || '') : String(h || '');
 }
 
-export const ipDe = (req) => cabecera(req, 'x-forwarded-for').split(',')[0].trim() || req.socket?.remoteAddress || 'local';
+// IP del cliente para los límites. `x-forwarded-for` la escribe quien envía la petición, así que solo se
+// usa detrás de un proxy de confianza: en Vercel (que reescribe x-real-ip y x-forwarded-for) o si se
+// activa CONFIAR_PROXY=1. En local se usa la dirección de la conexión, que no se puede falsificar.
+export function ipDe(req) {
+  if (process.env.VERCEL || process.env.CONFIAR_PROXY === '1') {
+    const ip = cabecera(req, 'x-real-ip').trim() || cabecera(req, 'x-forwarded-for').split(',')[0].trim();
+    if (ip) return ip;
+  }
+  return req.socket?.remoteAddress || 'local';
+}
+
+// Límites por minuto. Un aula entera suele salir a internet por una sola IP, así que el límite por IP
+// alcanza para unas 60 personas a la vez; el límite global protege el presupuesto de IA y el almacén.
+// Se ajustan sin tocar código con LIMITE_<NOMBRE>_IP y LIMITE_<NOMBRE>_GLOBAL (p. ej. LIMITE_DOCUMENTOS_GLOBAL).
+export const LIMITES = {
+  carlos: { ip: 240, global: 2000 },
+  intentos: { ip: 120, global: 600 },
+  documentos: { ip: 90, global: 300 },
+  archivos: { ip: 90, global: 300 },
+  tareas: { ip: 10, global: 100 },
+};
+
+function limiteDe(nombre, tipo) {
+  const env = Number(process.env[`LIMITE_${nombre.toUpperCase()}_${tipo.toUpperCase()}`]);
+  return Number.isFinite(env) && env > 0 ? env : LIMITES[nombre][tipo];
+}
 
 // Si el contador falla, se deja pasar: es mejor no limitar que cortar una defensa en curso.
-export async function superaLimite(req, nombre, maxPorMinuto) {
+export async function superaLimite(req, nombre) {
   try {
-    return await incrementar(`limite:${nombre}:${ipDe(req)}`, 60) > maxPorMinuto;
+    if (await incrementar(`limite:${nombre}:ip:${ipDe(req)}`, 60) > limiteDe(nombre, 'ip')) return true;
+    return await incrementar(`limite:${nombre}:global`, 60) > limiteDe(nombre, 'global');
   } catch (e) {
     console.error(`[api/${nombre}]`, e.message);
     return false;
   }
 }
 
-export const cuerpo = (req) => (typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {});
+// JSON inválido en el cuerpo es un error del cliente (400), no del servidor.
+export function cuerpo(req) {
+  if (typeof req.body !== 'string') return req.body || {};
+  try {
+    return JSON.parse(req.body);
+  } catch {
+    throw errorHttp('JSON inválido', 400);
+  }
+}

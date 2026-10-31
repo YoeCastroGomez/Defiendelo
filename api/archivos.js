@@ -4,13 +4,12 @@
 import { prepararSubida, enlaceMaterial, enlaceEntrega } from '../modulos/archivos/archivos.js';
 import { superaLimite, cabecera, cuerpo } from '../compartido/http.js';
 
-const MAX_POR_MINUTO = 20;
-const ERRORES_PROPIOS = [400, 401, 404, 503];
+const ERRORES_PROPIOS = [400, 401, 403, 404, 503];
 
 export default async function handler(req, res) {
   try {
     if (req.method === 'POST') {
-      if (await superaLimite(req, 'archivos', MAX_POR_MINUTO)) return res.status(429).json({ error: 'Demasiadas subidas seguidas. Espera un minuto.' });
+      if (await superaLimite(req, 'archivos')) return res.status(429).json({ error: 'Demasiadas subidas seguidas. Espera un minuto.' });
       return res.status(201).json(await prepararSubida(cuerpo(req)));
     }
     if (req.method === 'GET') {

@@ -41,13 +41,15 @@ describe('una sola entrega por estudiante', () => {
     assert.equal(otra.status, 409);
   });
 
-  test('si dos intentos se abrieron antes de entregar, el segundo cierre se rechaza', async () => {
+  test('si se abrieron dos intentos sin responder, solo el último sirve para entregar', async () => {
     const { codigo } = await nuevaTarea();
     const a = await abrir(codigo, 'Luz');
     const b = await abrir(codigo, 'luz');
-    for (const x of [a, b]) await llamar(apiCarlos, { method: 'POST', body: { intento: x.json.intento, puntoId: 'p1', historial: [{ rol: 'estudiante', texto: 'No sé.' }] } });
-    assert.equal((await llamar(apiSesiones, { method: 'POST', body: { modo: 'evaluacion', intento: a.json.intento } })).status, 201);
-    assert.equal((await llamar(apiSesiones, { method: 'POST', body: { modo: 'evaluacion', intento: b.json.intento } })).status, 409);
+    const responderEn = (x) => llamar(apiCarlos, { method: 'POST', body: { intento: x.json.intento, puntoId: 'p1', historial: [{ rol: 'estudiante', texto: 'No sé.' }] } });
+    assert.equal((await responderEn(a)).status, 409);
+    assert.equal((await responderEn(b)).status, 200);
+    assert.equal((await llamar(apiSesiones, { method: 'POST', body: { modo: 'evaluacion', intento: a.json.intento } })).status, 409);
+    assert.equal((await llamar(apiSesiones, { method: 'POST', body: { modo: 'evaluacion', intento: b.json.intento } })).status, 201);
   });
 
   test('reintentar el cierre del mismo intento no crea otra entrega', async () => {

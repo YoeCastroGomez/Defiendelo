@@ -9,9 +9,9 @@ import { proveedorConfigurado } from '../compartido/llm.js';
 import { obtenerTareaInterna } from '../modulos/tareas/tareas.js';
 import { limpiarArchivo } from '../compartido/archivos.js';
 import { limpio, superaLimite, cuerpo } from '../compartido/http.js';
+import { exigirAccesoCaso } from '../modulos/casos/acceso.js';
 
-// Cada trabajo cuesta hasta 2 llamadas largas a la IA: el límite evita que alguien agote el presupuesto.
-const MAX_POR_MINUTO = 6;
+// Cada trabajo cuesta hasta 2 llamadas largas a la IA: los límites (por IP y global) protegen el presupuesto.
 const nuevoCasoId = () => 'doc-' + randomBytes(8).toString('hex');
 
 export default async function handler(req, res) {
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'método no permitido' });
   try {
-    if (await superaLimite(req, 'documentos', MAX_POR_MINUTO)) return res.status(429).json({ error: 'Demasiados trabajos procesados seguidos. Espera un minuto e intenta de nuevo.' });
+    if (await superaLimite(req, 'documentos')) return res.status(429).json({ error: 'Demasiados trabajos procesados seguidos. Espera un minuto e intenta de nuevo.' });
     const b = cuerpo(req);
     const texto = typeof b.texto === 'string' ? b.texto : '';
     if (!texto.trim()) return res.status(400).json({ error: 'Falta el texto del trabajo' });
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
       tarea: limpio(b.tarea, 120),
       criterios: limpio(b.criterios, 600),
       estudiante: limpio(b.estudiante, 80),
-      evitar: Array.isArray(b.evitar) ? b.evitar.slice(0, 8).map((x) => limpio(x, 300)) : [],
+      evitar: [],
       universidadId: 'demo',
     };
 
@@ -41,6 +41,13 @@ export default async function handler(req, res) {
       const t = await obtenerTareaInterna(b.codigo);
       if (!t) return res.status(404).json({ error: 'No existe una tarea con ese código' });
       Object.assign(datos, { curso: t.curso, tarea: t.titulo, criterios: t.criterios, enunciado: t.enunciado, teoria: t.teoria, codigo: t.codigo });
+    }
+
+    // Dudas nuevas para la entrega: las del ensayo se leen del caso anterior en el servidor, con su llave.
+    // Así el navegador no puede meter texto propio en el prompt.
+    if (b.casoAnterior) {
+      const anterior = await exigirAccesoCaso(limpio(b.casoAnterior, 64), { llave: limpio(b.llaveAnterior, 64) });
+      datos.evitar = anterior.puntos.map((p) => limpio(p.apertura, 300));
     }
 
     const { caso } = await generarCaso({ ...datos, id: nuevoCasoId() });

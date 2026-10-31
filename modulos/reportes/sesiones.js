@@ -2,11 +2,17 @@
 // que el servidor registró durante el intento: el navegador solo aporta las señales que únicamente
 // él puede observar (salidas de la pestaña, intentos de pegar y de captura).
 import { randomBytes } from 'node:crypto';
-import { agregar, listar } from '../../compartido/almacen.js';
+import { agregar, listar, leer, recortarLista } from '../../compartido/almacen.js';
 import { errorHttp, limpio } from '../../compartido/http.js';
 import { obtenerTareaInterna, verificarTokenProfesor } from '../tareas/tareas.js';
 import { cargarCaso } from '../casos/casos.js';
-import { leerIntento, evaluacionesFinales, entregaPrevia, CODIGO_DEMO } from './intentos.js';
+import {
+  leerIntento, evaluacionesFinales, evaluacionesDe, entregaPrevia, casoDelIntento, crearIntento,
+  intentoVigenteDe, esIntentoVigente, entregaDelIntento, marcarEntrega, listarIntentos, CODIGO_DEMO,
+} from './intentos.js';
+
+const MAX_SESIONES_DEMO = 200; // la demo admite entregas ilimitadas: solo se guardan las últimas
+const MINUTOS_ABANDONO = 20; // sin actividad durante este tiempo, una entrega empezada se cierra sola
 
 const enteroSenal = (v) => Math.max(0, Math.min(999, Math.floor(Number(v) || 0)));
 const TIPOS = ['decision', 'trampa', 'condicion'];
@@ -48,7 +54,7 @@ function resultadosRegistrados(caso, finales) {
   return resultados;
 }
 
-function senalesDeSesion(raw, resultados, finales) {
+function senalesDeSesion(raw, resultados, finales, abandonada) {
   const s = raw && typeof raw === 'object' ? raw : {};
   const turnos = [...finales.values()].flatMap((r) => r.turnos);
   return {
@@ -59,37 +65,60 @@ function senalesDeSesion(raw, resultados, finales) {
     dubitativo: turnos.filter((t) => t.dubitativo).length,
     iaCaida: turnos.some((t) => t.iaCaida),
     sinRegistro: Object.values(resultados).filter((r) => r.sinRegistro).length,
+    abandonada: !!abandonada,
   };
+}
+
+// Abre una entrega. Hay un solo intento vigente por estudiante y tarea: si ya había uno con respuestas
+// (se fue a mitad), ese se entrega con lo que alcanzó a responder y no se abre otro.
+export async function iniciarIntento({ codigo, nombre, casoId, llave } = {}) {
+  const n = limpio(nombre, 80);
+  if (!n) throw errorHttp('Falta el nombre del estudiante', 400);
+  const tarea = await obtenerTareaInterna(codigo);
+  if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
+  if (tarea.cerrada) throw errorHttp('Esta tarea está cerrada: ya no recibe entregas. Todavía puedes ensayar.', 403);
+  if (await entregaPrevia(tarea, n)) throw errorHttp('Ya entregaste esta tarea con ese nombre. Solo se permite un intento; puedes seguir ensayando.', 409);
+
+  const previo = tarea.codigo === CODIGO_DEMO ? null : await intentoVigenteDe(tarea.codigo, n);
+  if (previo && (await evaluacionesDe(previo)).length) {
+    await cerrarIntento(previo, { abandonada: true });
+    throw errorHttp('Ya habías empezado esta entrega y saliste a mitad: se entregó lo que alcanzaste a responder. Solo se permite un intento; puedes seguir ensayando.', 409);
+  }
+  const intento = await crearIntento(tarea, n, await casoDelIntento(tarea, casoId, llave));
+  return { intento: intento.id, casoId: intento.casoId };
 }
 
 export async function guardarSesion(datos = {}) {
   if (datos.modo !== 'evaluacion') throw errorHttp('Solo se guardan reportes en modo evaluación', 400);
   if (!datos.intento) throw errorHttp('Falta el intento de la entrega', 400);
-  const intento = await leerIntento(datos.intento);
+  return cerrarIntento(await leerIntento(datos.intento), { senales: datos.senales, abandonada: datos.abandonada === true });
+}
 
+async function cerrarIntento(intento, { senales: senalesRaw, abandonada = false } = {}) {
   const tarea = await obtenerTareaInterna(intento.codigo);
   if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
 
   // Un reintento del mismo intento (se perdió la respuesta) no es una segunda entrega.
-  const previa = await entregaPrevia(tarea, intento.nombre);
-  if (previa) {
-    if (previa.intento === intento.id) return { id: previa.id, nivelGeneral: previa.nivelGeneral };
+  const marca = await entregaDelIntento(intento);
+  if (marca) {
+    if (marca.intento === intento.id) return { id: marca.id, nivelGeneral: marca.nivelGeneral };
     throw errorHttp('Ya entregaste esta tarea con ese nombre. Solo se permite un intento.', 409);
   }
-  if (tarea.codigo === CODIGO_DEMO) {
-    const repetida = (await listar('sesiones:' + tarea.codigo)).find((s) => s.intento === intento.id);
-    if (repetida) return { id: repetida.id, nivelGeneral: repetida.nivelGeneral };
-  }
+  if (!(await esIntentoVigente(intento))) throw errorHttp('Este intento ya no es válido: se empezó otra entrega con ese nombre.', 409);
+  const previa = await entregaPrevia(tarea, intento.nombre);
+  if (previa) throw errorHttp('Ya entregaste esta tarea con ese nombre. Solo se permite un intento.', 409);
 
   const caso = await cargarCaso(intento.casoId);
   const finales = await evaluacionesFinales(intento);
   if (!finales.size) throw errorHttp('La sesión debe contener al menos un punto evaluado', 400);
   const resultados = resultadosRegistrados(caso, finales);
-  const senales = senalesDeSesion(datos.senales, resultados, finales);
+  const senales = senalesDeSesion(senalesRaw, resultados, finales, abandonada);
   const nivelGeneral = calcularNivelGeneral(resultados);
 
-  // La duración se mide desde que el servidor abrió el intento.
-  const transcurrido = Math.round((Date.now() - Date.parse(intento.creado)) / 1000);
+  // La duración va de que el servidor abrió el intento a la última respuesta registrada.
+  const ultimo = Math.max(...[...finales.values()].flatMap((r) => r.turnos.map((t) => Date.parse(t.creado) || 0)));
+  const fin = abandonada ? ultimo : Date.now();
+  const transcurrido = Math.round((fin - Date.parse(intento.creado)) / 1000);
   const duracionSegundos = Math.max(0, Math.min(7200, Number.isFinite(transcurrido) ? transcurrido : 0));
 
   const sesion = {
@@ -107,8 +136,29 @@ export async function guardarSesion(datos = {}) {
     creada: new Date().toISOString(),
   };
 
+  // La marca es atómica: si dos cierres llegan a la vez, solo uno guarda la sesión.
+  const otra = await marcarEntrega(intento, { id: sesion.id, nivelGeneral });
+  if (otra) {
+    if (otra.intento === intento.id) return { id: otra.id, nivelGeneral: otra.nivelGeneral };
+    throw errorHttp('Ya entregaste esta tarea con ese nombre. Solo se permite un intento.', 409);
+  }
   await agregar('sesiones:' + tarea.codigo, sesion);
+  if (tarea.codigo === CODIGO_DEMO) await recortarLista('sesiones:' + tarea.codigo, MAX_SESIONES_DEMO);
   return { id: sesion.id, nivelGeneral };
+}
+
+// Entregas empezadas, con respuestas y sin actividad hace rato: se cierran como abandonadas para que
+// el profesor las vea. Los intentos sin ninguna respuesta no cuentan como entrega.
+async function cerrarAbandonadas(tarea) {
+  if (tarea.codigo === CODIGO_DEMO) return;
+  const limite = Date.now() - MINUTOS_ABANDONO * 60 * 1000;
+  for (const { id } of await listarIntentos(tarea.codigo)) {
+    const intento = await leer('intento:' + id);
+    if (!intento || await entregaDelIntento(intento) || !(await esIntentoVigente(intento))) continue;
+    const evaluaciones = await evaluacionesDe(intento);
+    if (!evaluaciones.length || Math.max(...evaluaciones.map((e) => Date.parse(e.creado) || 0)) > limite) continue;
+    await cerrarIntento(intento, { abandonada: true }).catch((e) => console.error('[sesiones] no se cerró un intento abandonado:', e.message));
+  }
 }
 
 export async function consultarSesiones(codigoRaw, tokenRecibido) {
@@ -121,6 +171,7 @@ export async function consultarSesiones(codigoRaw, tokenRecibido) {
     throw errorHttp('Token de profesor inválido o ausente', 401);
   }
 
+  await cerrarAbandonadas(tarea);
   const sesiones = await listar('sesiones:' + tarea.codigo);
   sesiones.reverse();
 
