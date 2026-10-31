@@ -55,18 +55,46 @@
         <div class="pila-c"><label class="etq" for="t-prof">Profesor</label><input id="t-prof" type="text" placeholder="Tu nombre" maxlength="80"></div>
       </div>
       <div class="pila-c"><label class="etq" for="t-titulo">Título de la tarea</label><input id="t-titulo" type="text" placeholder="p. ej. Informe final de arquitectura" required maxlength="120"></div>
+
+      <fieldset>
+        <legend class="etq">Tipo de actividad</legend>
+        <div class="dos-col">
+          <label class="opcion"><input type="radio" name="t-tipo" value="evaluacion" required>
+            <span><b>Evaluación calificada</b><br><span class="suave chico">Cuenta para la nota. Al vencer el plazo, se cierran las entregas.</span></span></label>
+          <label class="opcion"><input type="radio" name="t-tipo" value="practica">
+            <span><b>Práctica</b><br><span class="suave chico">Para entrenar. La fecha es de referencia y no bloquea nada.</span></span></label>
+        </div>
+      </fieldset>
+
+      <div class="pila-c"><label class="etq" for="t-fecha">Fecha límite</label>
+        <div class="fila" style="gap:8px;flex-wrap:wrap">
+          <input id="t-fecha" type="datetime-local" required style="flex:1;min-width:220px">
+          <button class="btn claro chico-btn" type="button" data-plazo="hoy">Hoy 23:59</button>
+          <button class="btn claro chico-btn" type="button" data-plazo="semana">En 1 semana</button>
+        </div>
+        <span class="chico suave" id="t-fecha-ayuda">Elige primero el tipo de actividad.</span></div>
+
       <div class="pila-c"><label class="etq" for="t-crit">Qué deben poder explicar</label>
         <textarea id="t-crit" class="claro" rows="3" maxlength="600" placeholder="p. ej. Por qué eligieron esa arquitectura y cómo responde a un cambio de requisitos."></textarea></div>
-      <div class="pila-c"><span class="etq" style="margin:0">Instrucciones de la tarea (opcional, hasta 5 archivos)</span>
-        <span class="chico suave">El enunciado, la rúbrica o lo que necesiten. Tus estudiantes podrán leerlo y descargarlo, y Carlos lo tendrá en cuenta.</span>
-        <div id="caja-enunciado"></div></div>
-      <div class="pila-c"><span class="etq" style="margin:0">Teoría del curso (opcional, hasta 5 archivos)</span>
-        <span class="chico suave">Lecturas o apuntes de apoyo. Tus estudiantes podrán leerlos y descargarlos, y Carlos los usará para preparar dudas de este curso.</span>
-        <div id="caja-teoria"></div></div>
-      <div class="pila-c"><label class="etq" for="t-caso">Qué defenderán tus estudiantes</label><select id="t-caso"></select>
-        <span class="chico suave" id="t-origen-ayuda"></span>
-        <div id="caja-base-prof" class="oculto"></div></div>
-      <div class="pila-c oculto"><label class="etq" for="t-cierre">Cierre (opcional)</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
+
+      <fieldset>
+        <legend class="etq">Qué defenderán tus estudiantes</legend>
+        <div class="dos-col">
+          <label class="opcion"><input type="radio" name="t-origen" value="estudiante" checked>
+            <span><b>Su propia tarea</b><br><span class="suave chico">Cada estudiante entra con el código, sube su resolución y la defiende.</span></span></label>
+          <label class="opcion"><input type="radio" name="t-origen" value="comun">
+            <span><b>Un documento que yo les doy</b><br><span class="suave chico">Todos estudian el mismo texto (una lectura, un caso) y lo defienden. Nadie sube nada.</span></span></label>
+        </div>
+      </fieldset>
+
+      <div class="pila-c" id="zona-propia"><span class="etq" style="margin:0">Material para la tarea (opcional, hasta 10 archivos)</span>
+        <span class="chico suave">Guías, rúbricas, plantillas y teoría del curso, todo en un solo lugar. Indica qué es cada archivo: tus estudiantes podrán leerlos y descargarlos, y Carlos los usará para preparar sus dudas.</span>
+        <div id="caja-material"></div></div>
+
+      <div class="pila-c oculto" id="zona-comun"><span class="etq" style="margin:0">Documento que defenderán</span>
+        <span class="chico suave">Sube el texto que todos deben estudiar. Carlos prepara sus dudas sobre él y tus estudiantes lo verán al entrar.</span>
+        <div id="caja-base-prof"></div></div>
+
       <p class="error" id="tarea-err" role="alert"></p>
       <button class="btn" type="submit" id="b-crear">Generar código</button>
     </form>
@@ -74,6 +102,7 @@
     <div class="tarjeta oscura pila oculto" id="creada" aria-live="polite">
       <p class="mono chico" style="color:var(--osc-suave)">comparte este código con tus estudiantes</p>
       <p class="codigo-grande" id="c-codigo"></p>
+      <p class="mono chico" id="c-resumen" style="color:var(--amarillo)"></p>
       <p class="chico" id="c-aviso" style="color:var(--osc-suave)"></p>
       <div id="c-token-caja" class="pila-c oculto" style="border-top:1px solid var(--osc2);padding-top:12px;margin-top:4px">
         <span class="mono chico" style="color:var(--osc-suave)">tu llave de profesor (guárdala: solo se muestra una vez)</span>
@@ -99,6 +128,7 @@
   <main class="inicio">
     <div class="hero">
       <p class="mono suave" id="i-curso"></p>
+      <p class="mono chico" id="i-plazo"></p>
       <h1 id="i-titulo"></h1>
       <div id="i-crit-caja" class="oculto"><p class="etq">Lo que tu profesor espera que puedas explicar</p><p class="lead" id="i-crit"></p></div>
       <details id="i-enunciado-caja" class="enunciado oculto"><summary id="i-enunciado-nombre"></summary><div id="i-enunciado"></div><div class="enunciado-bajar pila-c" id="i-enunciado-archivos"></div></details>

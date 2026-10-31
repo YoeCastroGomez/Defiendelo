@@ -324,8 +324,16 @@
     });
   });
 
-  /* ---------- profesor: instrucciones y teoría ---------- */
-  function cajaMaterial(idCaja, etiqueta, maximo, porDefecto) {
+  /* ---------- profesor: material de la tarea (guías, plantillas y teoría en una sola caja) ---------- */
+  // Cada archivo lleva su tipo. Las guías y plantillas le dicen a Carlos qué se pidió; la teoría le da
+  // contexto del curso. El servidor admite hasta 5 de cada grupo.
+  const TIPOS_MATERIAL = { guia: 'Guía o rúbrica', plantilla: 'Plantilla', teoria: 'Teoría del curso' };
+  const MAX_ARCHIVOS_CAJA = MAX_ARCHIVOS_MATERIAL * 2;
+  const adivinarTipo = (nombre) => (/teor|lectura|apunte|cap[ií]tulo|clase|separata/i.test(nombre) ? 'teoria'
+    : /plantilla|formato|template|modelo/i.test(nombre) ? 'plantilla' : 'guia');
+  const esTeoria = (d) => d.tipo === 'teoria';
+
+  function cajaMaterialUnica(idCaja) {
     let documentos = [];
     const lista = document.createElement('div');
     lista.className = 'pila-c';
@@ -333,98 +341,154 @@
       lista.replaceChildren(...documentos.map((d) => {
         const fila = document.createElement('div');
         fila.className = 'archivo';
+        fila.style.flexWrap = 'wrap';
         const nombre = document.createElement('span');
         nombre.textContent = d.nombre;
+        nombre.style.flex = '1';
+        const tipo = document.createElement('select');
+        tipo.setAttribute('aria-label', 'Tipo de ' + d.nombre);
+        tipo.style.width = 'auto';
+        for (const [valor, texto] of Object.entries(TIPOS_MATERIAL)) {
+          const o = document.createElement('option');
+          o.value = valor; o.textContent = texto; o.selected = d.tipo === valor;
+          tipo.appendChild(o);
+        }
+        tipo.onchange = () => { d.tipo = tipo.value; };
         const quitar = document.createElement('button');
         quitar.type = 'button';
         quitar.className = 'enlace-texto';
         quitar.textContent = 'Quitar';
         quitar.setAttribute('aria-label', 'Quitar ' + d.nombre);
         quitar.onclick = () => { documentos = documentos.filter((x) => x !== d); pintar(); };
-        fila.append(nombre, quitar);
+        fila.append(nombre, tipo, quitar);
         return fila;
       }));
     }
     crearCaja($(idCaja), {
-      etiqueta,
+      etiqueta: 'Sube guías, plantillas o teoría',
       minimo: MIN_PALABRAS_ENUNCIADO,
-      maximo,
+      maximo: MAX_PALABRAS_ENUNCIADO + MAX_PALABRAS_TEORIA,
       varios: true,
       async procesar(texto, titulo, avisar, archivo) {
-        if (documentos.length >= MAX_ARCHIVOS_MATERIAL) throw new Error(`Puedes subir hasta ${MAX_ARCHIVOS_MATERIAL} archivos aquí.`);
-        const total = documentos.reduce((n, d) => n + contarPalabras(d.texto), contarPalabras(texto));
-        if (total > maximo) throw new Error(`Estos archivos suman ${total.toLocaleString('es-PE')} palabras y el máximo es ${maximo.toLocaleString('es-PE')}.`);
+        if (documentos.length >= MAX_ARCHIVOS_CAJA) throw new Error(`Puedes subir hasta ${MAX_ARCHIVOS_CAJA} archivos.`);
         avisar('Guardando tu archivo…');
         const original = await guardarOriginal(archivo, 'enunciado');
-        documentos.push({ texto, nombre: titulo || porDefecto, original });
+        const nombre = titulo || `Texto pegado ${documentos.filter((d) => !d.original).length + 1}`;
+        documentos.push({ texto, nombre, original, tipo: adivinarTipo(archivo?.name || nombre) });
         pintar();
         avisar('');
       },
     });
     $(idCaja).appendChild(lista);
-    return {
-      texto: () => documentos.map((d) => `--- ${d.nombre} ---\n${d.texto}`).join('\n\n'),
-      nombres: () => documentos.map((d) => d.nombre).join(', ').slice(0, 120),
-      archivos: () => documentos.map((d) => d.original).filter(Boolean),
+
+    // Se valida al crear la tarea, porque el profesor puede cambiar el tipo de cada archivo hasta el final.
+    function grupo(filtro, max, palabras, nombreGrupo) {
+      const docs = documentos.filter(filtro);
+      if (docs.length > max) throw new Error(`Puedes subir hasta ${max} archivos de ${nombreGrupo}.`);
+      const total = docs.reduce((n, d) => n + contarPalabras(d.texto), 0);
+      if (total > palabras) throw new Error(`Los archivos de ${nombreGrupo} suman ${total.toLocaleString('es-PE')} palabras y el máximo es ${palabras.toLocaleString('es-PE')}.`);
+      return docs;
+    }
+    return () => {
+      const guias = grupo((d) => !esTeoria(d), MAX_ARCHIVOS_MATERIAL, MAX_PALABRAS_ENUNCIADO, 'guías y plantillas');
+      const teoria = grupo(esTeoria, MAX_ARCHIVOS_MATERIAL, MAX_PALABRAS_TEORIA, 'teoría');
+      const unir = (docs) => docs.map((d) => `--- ${TIPOS_MATERIAL[d.tipo]}: ${d.nombre} ---\n${d.texto}`).join('\n\n');
+      return {
+        enunciado: unir(guias),
+        enunciadoNombre: guias.map((d) => d.nombre).join(', ').slice(0, 120),
+        enunciadoArchivos: guias.map((d) => d.original).filter(Boolean),
+        teoria: unir(teoria),
+        teoriaArchivos: teoria.map((d) => d.original).filter(Boolean),
+      };
     };
   }
 
-  const instrucciones = cajaMaterial('caja-enunciado', 'Sube las instrucciones de la tarea', MAX_PALABRAS_ENUNCIADO, 'Instrucciones');
-  const teoria = cajaMaterial('caja-teoria', 'Sube la teoría del curso', MAX_PALABRAS_TEORIA, 'Teoría');
-  window.enunciadoTarea = () => ({
-    enunciado: instrucciones.texto(),
-    enunciadoNombre: instrucciones.nombres(),
-    enunciadoArchivos: instrucciones.archivos(),
-    teoria: teoria.texto(),
-    teoriaArchivos: teoria.archivos(),
-  });
+  const material = cajaMaterialUnica('caja-material');
 
-  /* ---------- profesor: elige el origen del trabajo ---------- */
-  // app.js solo llena #t-caso si está vacío; por eso la opción se agrega después de que lo llene.
-  const selector = $('t-caso');
-  const nuevaOpcion = (valor, texto) => {
-    const o = document.createElement('option');
-    o.value = valor;
-    o.textContent = texto;
-    return o;
-  };
-  const AYUDA_ORIGEN = {
-    estudiante: 'Es lo normal: cada estudiante entra con el código, sube su tarea y la defiende.',
-    subir: 'Solo para casos especiales, como una lectura común: nadie sube nada y todos defienden este archivo.',
-  };
+  /* ---------- profesor: qué defienden los estudiantes ---------- */
+  let base = null; // { casoId, llave, titulo } del documento común ya procesado
+  const origen = () => document.querySelector('input[name=t-origen]:checked')?.value || 'estudiante';
 
   function actualizarOrigen() {
-    const subir = selector.value === 'subir';
-    const zona = $('caja-base-prof');
-    $('t-origen-ayuda').textContent = AYUDA_ORIGEN[selector.value] || 'Trabajo de ejemplo: nadie sube nada y todos defienden este documento.';
-    $('b-crear').disabled = subir;
-    zona.classList.toggle('oculto', !subir);
-    if (subir) montarBase();
-    else zona.replaceChildren();
+    const comun = origen() === 'comun';
+    $('zona-propia').classList.toggle('oculto', comun);
+    $('zona-comun').classList.toggle('oculto', !comun);
+    // Con documento común, el código se genera recién cuando el documento está procesado.
+    $('b-crear').disabled = comun && !base;
+    if (comun && !$('caja-base-prof').childElementCount) montarBase();
+  }
+  document.querySelectorAll('input[name=t-origen]').forEach((r) => r.addEventListener('change', actualizarOrigen));
+
+  function mostrarBase() {
+    const caja = $('caja-base-prof');
+    const fila = document.createElement('div');
+    fila.className = 'archivo';
+    const nombre = document.createElement('span');
+    nombre.textContent = 'Listo: ' + base.titulo;
+    const cambiar = document.createElement('button');
+    cambiar.type = 'button';
+    cambiar.className = 'enlace-texto';
+    cambiar.textContent = 'Cambiar documento';
+    cambiar.onclick = () => { base = null; caja.replaceChildren(); montarBase(); actualizarOrigen(); };
+    fila.append(nombre, cambiar);
+    caja.replaceChildren(fila);
   }
 
-  new MutationObserver(() => {
-    if (selector.querySelector('option[value="estudiante"]')) return;
-    selector.prepend(nuevaOpcion('estudiante', 'Su propia tarea: cada estudiante sube su archivo (recomendado)'));
-    selector.appendChild(nuevaOpcion('subir', 'Un mismo trabajo para todos: lo subo yo…'));
-    selector.value = 'estudiante';
-    actualizarOrigen();
-  }).observe(selector, { childList: true });
-  selector.addEventListener('change', actualizarOrigen);
-
   const montarBase = () => crearCaja($('caja-base-prof'), {
-    etiqueta: 'Sube el trabajo común',
+    etiqueta: 'Sube el documento común',
     async procesar(texto, titulo, avisar, archivo) {
       avisar('Guardando tu archivo…');
       const original = await guardarOriginal(archivo, 'base');
       avisar('2/2 Preparando las dudas de Carlos…');
-      const tituloBase = titulo || $('t-titulo').value;
-      const d = await crearDocumento({ archivo: original, titulo: tituloBase, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
-      const opcion = nuevaOpcion(d.casoId, 'Trabajo subido: ' + d.titulo);
-      opcion.dataset.llave = d.llave; // la tarea solo puede usar este trabajo si presenta su llave
-      selector.querySelector('option[value="subir"]').before(opcion);
-      selector.value = d.casoId;
+      const d = await crearDocumento({ archivo: original, titulo: titulo || $('t-titulo').value, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
+      base = { casoId: d.casoId, llave: d.llave, titulo: d.titulo };
+      mostrarBase();
       actualizarOrigen();
     },
   });
+
+  // Lo que app.js envía al crear la tarea. Lanza un error con un mensaje claro si algo falta.
+  window.datosOrigenTarea = () => {
+    if (origen() === 'comun') {
+      if (!base) throw new Error('Sube el documento que defenderán tus estudiantes.');
+      return { casoId: base.casoId, llaveCaso: base.llave };
+    }
+    return { casoId: 'estudiante', ...material() };
+  };
+
+  /* ---------- profesor: tipo de actividad y fecha límite ---------- */
+  const AYUDA_FECHA = {
+    evaluacion: 'Después de esta fecha nadie puede empezar a entregar. Quien ya había empezado puede terminar, y su entrega queda marcada como fuera de plazo para que decidas.',
+    practica: 'Es una fecha de referencia: se puede entregar después, pero la entrega queda marcada como fuera de plazo.',
+  };
+  const tipoActividad = () => document.querySelector('input[name=t-tipo]:checked')?.value || '';
+  // datetime-local trabaja en la hora local del navegador, sin zona: se arma el texto a mano.
+  const aLocal = (fecha) => {
+    const d = new Date(fecha.getTime() - fecha.getTimezoneOffset() * 60000);
+    return d.toISOString().slice(0, 16);
+  };
+  function fijarMinimo() { $('t-fecha').min = aLocal(new Date()); }
+  document.querySelectorAll('input[name=t-tipo]').forEach((r) => r.addEventListener('change', () => {
+    $('t-fecha-ayuda').textContent = AYUDA_FECHA[tipoActividad()] || '';
+  }));
+  document.querySelectorAll('[data-plazo]').forEach((b) => {
+    b.onclick = () => {
+      const f = new Date();
+      if (b.dataset.plazo === 'semana') f.setDate(f.getDate() + 7);
+      f.setHours(23, 59, 0, 0);
+      $('t-fecha').value = aLocal(f);
+    };
+  });
+  $('t-fecha').addEventListener('focus', fijarMinimo);
+  fijarMinimo();
+
+  window.datosPlazoTarea = () => {
+    const tipo = tipoActividad();
+    if (!tipo) throw new Error('Elige si es una evaluación calificada o una práctica.');
+    const valor = $('t-fecha').value;
+    if (!valor) throw new Error('Elige la fecha límite.');
+    const fecha = new Date(valor); // se interpreta en la hora local del profesor
+    if (!(fecha.getTime() > Date.now())) throw new Error('La fecha límite ya pasó: elige una fecha futura.');
+    return { tipoActividad: tipo, fechaLimite: fecha.toISOString() };
+  };
 })();

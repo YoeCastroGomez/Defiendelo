@@ -42,7 +42,8 @@
       + (Number(senales.captura) || 0)
       + (senales.iaCaida ? 1 : 0)
       + (Number(senales.sinRegistro) || 0)
-      + (senales.abandonada ? 1 : 0);
+      + (senales.abandonada ? 1 : 0)
+      + (senales.fueraDePlazo ? 1 : 0);
   }
 
   function formatearDuracion(seg) {
@@ -392,6 +393,7 @@
     if (s.pegadoBloqueado) alertas.push(`${s.pegadoBloqueado} intento(s) de pegar texto`);
     if (s.captura) alertas.push(`${s.captura} intento(s) de captura o impresión`);
     if (s.iaCaida) alertas.push('evaluada parcialmente en modo respaldo');
+    if (s.fueraDePlazo) alertas.push('entregada después de la fecha límite');
     if (s.abandonada) alertas.push('salió a mitad de la entrega: se cerró con lo que alcanzó a responder');
     const pendientes = Object.values(ses.resultados || {}).filter((r) => r.pendiente).length;
     if (pendientes) alertas.push(`${pendientes} punto(s) con una repregunta sin responder`);
@@ -516,7 +518,9 @@
 
       $('p-info-curso').textContent = `${d.tarea.curso}${d.tarea.profesor ? ' · ' + d.tarea.profesor : ''} · código ${d.tarea.codigo}`;
       $('p-info-titulo').textContent = d.tarea.titulo;
-      $('p-info-foco').textContent = d.tarea.casoId === 'estudiante' ? 'entrega individual por estudiante' : `caso base: ${d.tarea.casoId}`;
+      const foco = d.tarea.casoId === 'estudiante' ? 'entrega individual por estudiante' : 'todos defienden un documento común';
+      const plazo = d.tarea.fechaLimite ? ` · ${ETIQUETA_ACTIVIDAD[d.tarea.tipoActividad] || ''} · fecha límite ${formatoFecha(d.tarea.fechaLimite)}` : '';
+      $('p-info-foco').textContent = foco + plazo;
       mostrarEstadoTarea(d.tarea);
 
       renderizarKPIs(estadoPanel.sesiones);
@@ -578,7 +582,7 @@
       const t = String(v ?? '');
       return `"${(/^[=+\-@\t\r]/.test(t) ? "'" + t : t).replace(/"/g, '""')}"`;
     };
-    const cab = ['Estudiante', 'Nivel sugerido', 'Duracion (s)', 'Puntos verdes', 'Total puntos', 'Alertas totales', 'Leyo literal', 'Dubitativo', 'Salidas pestana', 'Pegado bloqueado', 'Capturas', 'Salio a mitad', 'Puntos sin registro', 'Fecha ISO'];
+    const cab = ['Estudiante', 'Nivel sugerido', 'Duracion (s)', 'Puntos verdes', 'Total puntos', 'Alertas totales', 'Leyo literal', 'Dubitativo', 'Salidas pestana', 'Pegado bloqueado', 'Capturas', 'Salio a mitad', 'Puntos sin registro', 'Fuera de plazo', 'Fecha ISO'];
     const filas = estadoPanel.sesiones.map((s) => {
       const pts = Object.values(s.resultados || {});
       const verdes = pts.filter((p) => p.nivel === 'verde').length;
@@ -597,6 +601,7 @@
         sen.captura || 0,
         sen.abandonada ? 'si' : 'no',
         sen.sinRegistro || 0,
+        sen.fueraDePlazo ? 'si' : 'no',
         s.creada || '',
       ].map(esc).join(',');
     });

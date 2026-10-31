@@ -27,12 +27,32 @@ function tareaDemo() {
     profesor: 'Prof. de demostración',
     criterios: 'Por qué se eligió Observer, cómo reduce el acoplamiento, en qué se diferencia de Strategy y cómo se extiende el diseño.',
     cierre: '',
+    tipoActividad: 'practica',
+    fechaLimite: null, // la demo no vence
     casoId: 'demo',
     // Sin DEMO_TOKEN_PROFESOR no hay token: los reportes de la demo quedan cerrados.
     tokenProfesor: process.env.DEMO_TOKEN_PROFESOR || '',
     creada: '2026-10-30T00:00:00.000Z',
   };
 }
+
+// Tipo de actividad y fecha límite. En una evaluación, pasada la fecha ya no se puede empezar a entregar.
+// En una práctica la fecha es referencial: se puede entregar después, pero queda marcado como fuera de plazo.
+export const TIPOS_ACTIVIDAD = ['evaluacion', 'practica'];
+const MAX_DIAS_PLAZO = 366;
+
+function fechaLimiteValida(raw) {
+  const ms = Date.parse(String(raw || ''));
+  if (!raw || !Number.isFinite(ms)) throw errorHttp('Indica la fecha límite de la tarea', 400);
+  if (ms < Date.now() - 5 * 60 * 1000) throw errorHttp('La fecha límite ya pasó: elige una fecha futura', 400);
+  if (ms > Date.now() + MAX_DIAS_PLAZO * 24 * 60 * 60 * 1000) throw errorHttp('La fecha límite no puede estar a más de un año', 400);
+  return new Date(ms).toISOString();
+}
+
+// ¿Venció el plazo de la tarea? Las tareas antiguas o la demo no tienen fecha y nunca vencen.
+export const plazoVencido = (tarea, ahora = Date.now()) => !!tarea?.fechaLimite && ahora > Date.parse(tarea.fechaLimite);
+// En una evaluación vencida ya no se reciben entregas nuevas (igual que una tarea cerrada).
+export const noRecibeEntregas = (tarea) => !!tarea.cerrada || (tarea.tipoActividad === 'evaluacion' && plazoVencido(tarea));
 
 export function normalizarCodigo(raw) {
   let codigo = limpio(raw, 12).toUpperCase().replace(/[\s_]/g, '');
@@ -48,6 +68,8 @@ export async function crearTarea(datos = {}) {
   const titulo = limpio(datos.titulo, 120);
   const curso = limpio(datos.curso, 80);
   if (!titulo || !curso) throw errorHttp('Faltan el título o el curso', 400);
+  if (!TIPOS_ACTIVIDAD.includes(datos.tipoActividad)) throw errorHttp('Indica si la tarea es una evaluación o una práctica', 400);
+  const fechaLimite = fechaLimiteValida(datos.fechaLimite);
 
   const casoId = limpio(datos.casoId, 64) || 'demo';
   if (casoId !== 'estudiante') {
@@ -78,7 +100,9 @@ export async function crearTarea(datos = {}) {
     teoria: limpio(datos.teoria, 150000),
     teoriaArchivos: archivosEnviados(datos.teoriaArchivos),
     enunciadoArchivos: archivosEnviados(datos.enunciadoArchivos),
-    cierre: limpio(datos.cierre, 40),
+    cierre: '', // reemplazado por fechaLimite; se conserva para las tareas antiguas
+    tipoActividad: datos.tipoActividad,
+    fechaLimite,
     casoId,
     cerrada: false,
     tokenProfesor,

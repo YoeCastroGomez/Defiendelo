@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 import { agregar, listar, leer, recortarLista } from '../../compartido/almacen.js';
 import { errorHttp, limpio } from '../../compartido/http.js';
-import { obtenerTareaInterna, verificarTokenProfesor } from '../tareas/tareas.js';
+import { obtenerTareaInterna, verificarTokenProfesor, plazoVencido } from '../tareas/tareas.js';
 import { cargarCaso } from '../casos/casos.js';
 import {
   leerIntento, evaluacionesFinales, evaluacionesDe, entregaPrevia, casoDelIntento, crearIntento,
@@ -57,7 +57,7 @@ function resultadosRegistrados(caso, finales) {
   return resultados;
 }
 
-function senalesDeSesion(raw, resultados, finales, abandonada) {
+function senalesDeSesion(raw, resultados, finales, abandonada, fueraDePlazo) {
   const s = raw && typeof raw === 'object' ? raw : {};
   const turnos = [...finales.values()].flatMap((r) => r.turnos);
   return {
@@ -69,6 +69,9 @@ function senalesDeSesion(raw, resultados, finales, abandonada) {
     iaCaida: turnos.some((t) => t.iaCaida),
     sinRegistro: Object.values(resultados).filter((r) => r.sinRegistro).length,
     abandonada: !!abandonada,
+    // Entregada después de la fecha límite: en una práctica es solo un dato; en una evaluación,
+    // es alguien que empezó a tiempo y terminó tarde. El profesor decide si la califica.
+    fueraDePlazo: !!fueraDePlazo,
   };
 }
 
@@ -80,6 +83,7 @@ export async function iniciarIntento({ codigo, nombre, casoId, llave } = {}) {
   const tarea = await obtenerTareaInterna(codigo);
   if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
   if (tarea.cerrada) throw errorHttp('Esta tarea está cerrada: ya no recibe entregas. Todavía puedes ensayar.', 403);
+  if (tarea.tipoActividad === 'evaluacion' && plazoVencido(tarea)) throw errorHttp('El plazo de esta evaluación ya venció: ya no recibe entregas. Todavía puedes ensayar.', 403);
   if (await entregaPrevia(tarea, n)) throw errorHttp('Ya entregaste esta tarea con ese nombre. Solo se permite un intento; puedes seguir ensayando.', 409);
 
   const previo = tarea.codigo === CODIGO_DEMO ? null : await intentoVigenteDe(tarea.codigo, n);
@@ -117,7 +121,8 @@ async function cerrarIntento(intento, { senales: senalesRaw, abandonada = false 
   const resultados = resultadosRegistrados(caso, finales);
   // "Abandonada" es salir con puntos sin responder. Si respondió todo y solo falló el envío final, no lo es.
   const completa = caso.puntos.every((p) => finales.has(p.id) && !finales.get(p.id).pendiente);
-  const senales = senalesDeSesion(senalesRaw, resultados, finales, abandonada && !completa);
+  const ultimaRespuesta = Math.max(...[...finales.values()].flatMap((r) => r.turnos.map((t) => Date.parse(t.creado) || 0)));
+  const senales = senalesDeSesion(senalesRaw, resultados, finales, abandonada && !completa, plazoVencido(tarea, abandonada ? ultimaRespuesta : Date.now()));
   const nivelGeneral = calcularNivelGeneral(resultados);
 
   // La duración va de que el servidor abrió el intento a la última respuesta registrada.
@@ -188,6 +193,8 @@ export async function consultarSesiones(codigoRaw, tokenRecibido) {
       profesor: tarea.profesor,
       criterios: tarea.criterios,
       cierre: tarea.cierre,
+      tipoActividad: tarea.tipoActividad || null,
+      fechaLimite: tarea.fechaLimite || null,
       cerrada: !!tarea.cerrada,
       casoId: tarea.casoId,
       creada: tarea.creada,

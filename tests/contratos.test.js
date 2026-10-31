@@ -3,6 +3,9 @@
 import { test, describe, beforeEach, afterEach, after } from 'node:test';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
+
+// Toda tarea nueva necesita tipo de actividad y fecha límite.
+const PLAZO = { tipoActividad: 'evaluacion', fechaLimite: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() };
 import { existsSync, readFileSync } from 'node:fs';
 
 const VARIABLES = ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL', 'LLM_MODEL_RESPALDO', 'LLM_BASE_URL', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'DEMO_TOKEN_PROFESOR', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SUPABASE_BUCKET'];
@@ -106,24 +109,24 @@ describe('compartido/almacen.js', () => {
 
 describe('/api/tareas', () => {
   test('POST crea tarea con casoId demo y token de 32 caracteres', async () => {
-    const r = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'demo' } });
+    const r = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: 'demo' } });
     assert.equal(r.status, 201);
     assert.match(r.json.codigo, /^[A-Z0-9]{3}-[A-Z0-9]{3}$/);
     assert.match(r.json.tokenProfesor, /^[0-9a-f]{32}$/);
   });
 
   test('POST acepta casoId estudiante', async () => {
-    const r = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'estudiante' } });
+    const r = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: 'estudiante' } });
     assert.equal(r.status, 201);
   });
 
   test('POST sin título responde 400 y con caso inexistente 404', async () => {
-    assert.equal((await llamar(apiTareas, { method: 'POST', body: { curso: 'C1' } })).status, 400);
-    assert.equal((await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'inexistente' } })).status, 404);
+    assert.equal((await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, curso: 'C1' } })).status, 400);
+    assert.equal((await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: 'inexistente' } })).status, 404);
   });
 
   test('GET nunca devuelve tokenProfesor y normaliza el código', async () => {
-    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'estudiante' } });
+    const creada = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: 'estudiante' } });
     const sinGuion = creada.json.codigo.replace('-', '').toLowerCase();
     const r = await llamar(apiTareas, { query: { codigo: sinGuion } });
     assert.equal(r.status, 200);
@@ -291,7 +294,7 @@ describe('/api/carlos', () => {
 });
 
 describe('/api/sesiones', () => {
-  const nuevaTarea = async (extra = {}) => (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'demo', ...extra } })).json;
+  const nuevaTarea = async (extra = {}) => (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: 'demo', ...extra } })).json;
 
   test('POST arma el reporte con lo que registró el servidor e ignora los niveles del cliente', async () => {
     const { codigo } = await nuevaTarea();
@@ -352,9 +355,62 @@ describe('/api/sesiones', () => {
   });
 });
 
+describe('tipo de actividad y fecha límite', () => {
+  const crear = (extra) => llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'demo', ...PLAZO, ...extra } });
+  const panel = async (t) => (await llamar(apiSesiones, { query: { codigo: t.codigo }, headers: { 'x-token-profesor': t.tokenProfesor } })).json;
+  // Simula que el plazo ya pasó, sin esperar: se reescribe la fecha guardada.
+  async function vencer(codigo) {
+    const t = await almacen.leer('tarea:' + codigo);
+    await almacen.reemplazar('tarea:' + codigo, { ...t, fechaLimite: new Date(Date.now() - 60000).toISOString() });
+  }
+
+  test('crear una tarea exige tipo y una fecha límite futura de menos de un año', async () => {
+    assert.equal((await crear({ tipoActividad: undefined })).status, 400);
+    assert.equal((await crear({ tipoActividad: 'examen' })).status, 400);
+    assert.equal((await crear({ fechaLimite: undefined })).status, 400);
+    assert.equal((await crear({ fechaLimite: 'mañana' })).status, 400);
+    assert.equal((await crear({ fechaLimite: new Date(Date.now() - 3600e3).toISOString() })).status, 400);
+    assert.equal((await crear({ fechaLimite: new Date(Date.now() + 400 * 86400e3).toISOString() })).status, 400);
+    const ok = await crear({ tipoActividad: 'practica' });
+    assert.equal(ok.status, 201);
+    const publica = (await llamar(apiTareas, { query: { codigo: ok.json.codigo } })).json;
+    assert.equal(publica.tipoActividad, 'practica');
+    assert.equal(publica.fechaLimite, PLAZO.fechaLimite);
+  });
+
+  test('evaluación vencida: no abre entregas nuevas, pero quien empezó a tiempo termina y queda fuera de plazo', async () => {
+    const t = (await crear({ tipoActividad: 'evaluacion' })).json;
+    const a = (await abrirIntento(t.codigo, 'Temprano')).json.intento;
+    await vencer(t.codigo);
+    const tarde = await abrirIntento(t.codigo, 'Tarde');
+    assert.equal(tarde.status, 403);
+    assert.match(tarde.json.error, /plazo/);
+    await responder(a, 'p1', 'No sé.');
+    assert.equal((await cerrarSesion(a)).status, 201);
+    const [ses] = (await panel(t)).sesiones;
+    assert.equal(ses.senales.fueraDePlazo, true);
+  });
+
+  test('práctica vencida: se puede entregar, marcada como fuera de plazo', async () => {
+    const t = (await crear({ tipoActividad: 'practica' })).json;
+    await vencer(t.codigo);
+    const { cierre } = await entregar(t.codigo, 'Lucía', { p1: 'No sé.' });
+    assert.equal(cierre.status, 201);
+    const datos = await panel(t);
+    assert.equal(datos.sesiones[0].senales.fueraDePlazo, true);
+    assert.equal(datos.tarea.tipoActividad, 'practica');
+  });
+
+  test('una entrega a tiempo no queda fuera de plazo', async () => {
+    const t = (await crear({})).json;
+    await entregar(t.codigo, 'Puntual', { p1: 'No sé.' });
+    assert.equal((await panel(t)).sesiones[0].senales.fueraDePlazo, false);
+  });
+});
+
 describe('cerrar y reabrir una tarea', () => {
   test('solo el profesor la cierra; cerrada no abre entregas nuevas, y se puede reabrir', async () => {
-    const { codigo, tokenProfesor } = (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'demo' } })).json;
+    const { codigo, tokenProfesor } = (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'demo' } })).json;
     const cambiar = (cerrada, token = tokenProfesor) => llamar(apiTareas, { method: 'PATCH', query: { codigo }, body: { cerrada }, headers: { 'x-token-profesor': token } });
     const empezada = await abrirIntento(codigo, 'Antes');
 
@@ -404,7 +460,7 @@ describe('/api/archivos', () => {
     assert.equal((await pedir({ tipo: 'enunciado', nombre: 'a.png', tamano: 10 })).status, 400);
     assert.equal((await pedir({ tipo: 'enunciado', nombre: 'a.pdf', tamano: 11 * 1024 * 1024 })).status, 400);
     assert.equal((await pedir({ tipo: 'otro', nombre: 'a.pdf', tamano: 10 })).status, 400);
-    const { codigo } = (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
+    const { codigo } = (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
     const r = await pedir({ tipo: 'resolucion', nombre: 'Mi Tarea.DOCX', tamano: 10, codigo });
     assert.equal(r.status, 201);
     assert.match(r.json.ruta, /^resoluciones\/[0-9a-f]{32}\.docx$/);
@@ -416,9 +472,14 @@ describe('/api/archivos', () => {
     assert.equal((await pedir({ tipo: 'resolucion' })).status, 404);
     assert.equal((await pedir({ tipo: 'resolucion', codigo: 'ZZZ-ZZZ' })).status, 404);
     assert.equal((await pedir({ tipo: 'resolucion', codigo: 'DEMO-01' })).status, 400);
-    const t = (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
+    const t = (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
     await llamar(apiTareas, { method: 'PATCH', query: { codigo: t.codigo }, body: { cerrada: true }, headers: { 'x-token-profesor': t.tokenProfesor } });
     assert.equal((await pedir({ tipo: 'resolucion', codigo: t.codigo })).status, 403);
+    // Una evaluación con el plazo vencido tampoco recibe archivos de estudiantes.
+    const v = (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
+    const guardada = await almacen.leer('tarea:' + v.codigo);
+    await almacen.reemplazar('tarea:' + v.codigo, { ...guardada, fechaLimite: new Date(Date.now() - 60000).toISOString() });
+    assert.equal((await pedir({ tipo: 'resolucion', codigo: v.codigo })).status, 403);
     // El trabajo común lo sube el profesor antes de crear la tarea.
     const base = await pedir({ tipo: 'base' });
     assert.equal(base.status, 201);
@@ -431,8 +492,8 @@ describe('/api/archivos', () => {
   });
 
   test('el enunciado se baja con el código y no expone su ruta', async () => {
-    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivos: [{ ruta: RUTA_ENUNCIADO, nombre: 'Guía' }, { ruta: RUTA_ENUNCIADO_2, nombre: 'Rúbrica' }] } });
-    const conTeoria = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', teoriaArchivos: [{ ruta: RUTA_ENUNCIADO_2, nombre: 'Lectura' }] } });
+    const creada = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivos: [{ ruta: RUTA_ENUNCIADO, nombre: 'Guía' }, { ruta: RUTA_ENUNCIADO_2, nombre: 'Rúbrica' }] } });
+    const conTeoria = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante', teoriaArchivos: [{ ruta: RUTA_ENUNCIADO_2, nombre: 'Lectura' }] } });
     const lectura = await llamar(apiArchivos, { query: { codigo: conTeoria.json.codigo, tipo: 'teoria' } });
     assert.match(lectura.json.url, /download=Lectura\.pdf$/);
     assert.deepEqual((await llamar(apiTareas, { query: { codigo: conTeoria.json.codigo } })).json.teoriaDescargas, ['Lectura.pdf']);
@@ -450,12 +511,12 @@ describe('/api/archivos', () => {
   });
 
   test('una ruta inventada por el cliente se descarta', async () => {
-    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivos: [{ ruta: '../secreto.pdf', nombre: 'x' }] } });
+    const creada = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivos: [{ ruta: '../secreto.pdf', nombre: 'x' }] } });
     assert.equal((await llamar(apiArchivos, { query: { codigo: creada.json.codigo } })).status, 404);
   });
 
   test('la entrega solo la baja el profesor de esa tarea', async () => {
-    const crear = async () => (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
+    const crear = async () => (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
     const propia = await crear();
     const ajena = await crear();
     const doc = await llamar(apiDocumentos, { method: 'POST', body: { codigo: propia.codigo, titulo: 'R', texto, archivo: { ruta: RUTA_ENTREGA, nombre: 'Tarea.docx' } } });
@@ -519,7 +580,7 @@ describe('/api/documentos', () => {
   });
 
   test('el enunciado del profesor llega al estudiante y a la IA', async () => {
-    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'estudiante', enunciado: 'ENUNCIADO-DE-PRUEBA', enunciadoNombre: 'Guía 1' } });
+    const creada = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: 'estudiante', enunciado: 'ENUNCIADO-DE-PRUEBA', enunciadoNombre: 'Guía 1' } });
     const { codigo } = creada.json;
     const publica = await llamar(apiTareas, { query: { codigo } });
     assert.equal(publica.json.enunciado, 'ENUNCIADO-DE-PRUEBA');
@@ -536,7 +597,7 @@ describe('/api/documentos', () => {
   });
 
   test('la teoría del profesor llega al estudiante y a la IA', async () => {
-    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'estudiante', teoria: 'TEORIA-DE-PRUEBA' } });
+    const creada = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: 'estudiante', teoria: 'TEORIA-DE-PRUEBA' } });
     const { codigo } = creada.json;
     assert.equal((await llamar(apiTareas, { query: { codigo } })).json.teoria, 'TEORIA-DE-PRUEBA');
     const ia = simularIA([{ status: 500, error: 'x' }, { status: 500, error: 'x' }]);
@@ -555,9 +616,9 @@ describe('/api/documentos', () => {
 
   test('una tarea puede usar como base el caso recién creado, solo con su llave', async () => {
     const doc = await llamar(apiDocumentos, documento(palabras(300)));
-    const sinLlave = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: doc.json.casoId } });
+    const sinLlave = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: doc.json.casoId } });
     assert.equal(sinLlave.status, 403);
-    const r = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: doc.json.casoId, llaveCaso: doc.json.llave } });
+    const r = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T1', curso: 'C1', casoId: doc.json.casoId, llaveCaso: doc.json.llave } });
     assert.equal(r.status, 201);
     // Los estudiantes de esa tarea abren el trabajo base con el código.
     assert.equal((await llamar(apiCasos, { query: { id: doc.json.casoId, codigo: r.json.codigo } })).status, 200);
@@ -635,7 +696,7 @@ describe('el trabajo del estudiante entra a los prompts como datos', () => {
 
 describe('trabajos subidos: privados', () => {
   const palabras = (n) => Array.from({ length: n }, (_, k) => `palabra${k}${k % 12 === 11 ? '.' : ''}`).join(' ');
-  const nuevaTarea = async () => (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
+  const nuevaTarea = async () => (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
 
   test('conocer el id de un trabajo no basta para leerlo ni para defenderlo', async () => {
     const tarea = await nuevaTarea();
@@ -750,7 +811,7 @@ describe('/api/sesiones: lo que ve el profesor', () => {
 
   test('un token de otra tarea no abre los reportes', async () => {
     process.env.DEMO_TOKEN_PROFESOR = TOKEN_DEMO;
-    const otra = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante' } });
+    const otra = await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'estudiante' } });
     const r = await llamar(apiSesiones, { query: { codigo: 'DEMO-01' }, headers: { 'x-token-profesor': otra.json.tokenProfesor } });
     assert.equal(r.status, 401);
   });
@@ -803,7 +864,7 @@ describe('compartido/llm.js: respaldo de Gemini', () => {
 });
 
 describe('un solo intento por estudiante', () => {
-  const nuevaTarea = async () => (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'demo' } })).json;
+  const nuevaTarea = async () => (await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C', casoId: 'demo' } })).json;
   const panel = async (t) => (await llamar(apiSesiones, { query: { codigo: t.codigo }, headers: { 'x-token-profesor': t.tokenProfesor } })).json.sesiones;
 
   test('salir a mitad y volver a empezar entrega lo respondido y no abre otro intento', async () => {
@@ -908,8 +969,8 @@ describe('un solo intento por estudiante', () => {
 describe('límites y robustez', () => {
   test('una IP puede crear 10 tareas por minuto; la undécima responde 429', async () => {
     const ip = otraIp();
-    for (let k = 0; k < 10; k++) assert.equal((await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C' }, ip })).status, 201);
-    assert.equal((await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C' }, ip })).status, 429);
+    for (let k = 0; k < 10; k++) assert.equal((await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C' }, ip })).status, 201);
+    assert.equal((await llamar(apiTareas, { method: 'POST', body: { ...PLAZO, titulo: 'T', curso: 'C' }, ip })).status, 429);
   });
 
   test('x-forwarded-for solo se usa detrás de un proxy de confianza', async () => {
