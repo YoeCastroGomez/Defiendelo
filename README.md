@@ -30,10 +30,10 @@ Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 
 - El trabajo está **a la vista todo el tiempo**. Carlos señala la parte de la que habla y, al final, el reporte es **el mismo trabajo marcado** en verde, amarillo o rojo según lo que el estudiante pudo explicar.
 
 ### Cómo llega la tarea al estudiante
-1. El **profesor** crea la tarea (curso, título, qué deben poder explicar, documento con el enunciado y cierre) y recibe un **código** tipo `KXS-3NT` y un **token privado** para ver los reportes.
+1. El **profesor** crea la tarea (curso, título, qué deben poder explicar, instrucciones y teoría del curso de hasta 5 archivos cada una, y cierre) y recibe un **código** tipo `KXS-3NT` y un **token privado** para ver los reportes.
 2. Elige de dónde sale el trabajo: **cada estudiante sube el suyo** o **toda la clase defiende un trabajo base**.
 3. Comparte el código con la clase, o el enlace directo `…/?codigo=KXS-3NT`.
-4. El **estudiante** ingresa el código, lee el enunciado, escribe su nombre y elige el modo. Si la tarea lo pide, sube su resolución en `.pdf` o `.docx` (hasta 10 MB) o pega su texto.
+4. El **estudiante** ingresa el código, lee las instrucciones y la teoría, escribe su nombre y elige el modo. Si la tarea lo pide, sube su resolución en `.pdf` o `.docx` (hasta 10 MB) o pega su texto.
 
 Los códigos usan un alfabeto sin caracteres confusos (sin `0/O` ni `1/I/L`) para que se puedan dictar en clase, y se aceptan en minúsculas o sin guion. El código `DEMO-01` siempre abre la tarea de demostración.
 

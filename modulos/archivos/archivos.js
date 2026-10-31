@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { archivosConfigurado, crearEnlaceSubida, crearEnlaceDescarga } from '../../compartido/archivos.js';
 import { listar } from '../../compartido/almacen.js';
 import { cargarCaso } from '../casos/casos.js';
-import { obtenerTareaInterna, verificarTokenProfesor } from '../tareas/tareas.js';
+import { archivosDeInstrucciones, obtenerTareaInterna, verificarTokenProfesor } from '../tareas/tareas.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const CARPETAS = { enunciado: 'enunciados', resolucion: 'resoluciones' };
@@ -28,13 +28,15 @@ export async function prepararSubida({ tipo, nombre, tamano } = {}) {
   return { ruta, subirUrl: await crearEnlaceSubida(ruta) };
 }
 
-// El enunciado lo puede bajar cualquiera que tenga el código de la tarea.
-export async function enlaceEnunciado(codigo) {
+// Las instrucciones y la teoría las puede bajar cualquiera que tenga el código de la tarea.
+export async function enlaceMaterial(codigo, indice, tipo) {
   exigirConfiguracion();
   const tarea = await obtenerTareaInterna(codigo);
   if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
-  if (!tarea.enunciadoArchivo) throw errorHttp('Esta tarea no tiene un archivo para descargar', 404);
-  return { url: await crearEnlaceDescarga(tarea.enunciadoArchivo.ruta, tarea.enunciadoArchivo.nombre) };
+  const lista = tipo === 'teoria' ? tarea.teoriaArchivos || [] : archivosDeInstrucciones(tarea);
+  const archivo = lista[Number(indice) || 0];
+  if (!archivo) throw errorHttp('Esta tarea no tiene ese archivo para descargar', 404);
+  return { url: await crearEnlaceDescarga(archivo.ruta, archivo.nombre) };
 }
 
 // La tarea de un estudiante solo la baja el profesor de esa tarea, y solo si esa entrega le pertenece.
