@@ -21,12 +21,7 @@ Con la IA generativa, un estudiante puede entregar un trabajo impecable sin ente
 ### Aprendizajes con usuarios reales
 *[Pendiente: completar con las entrevistas reales. No se publican datos hasta tenerlos.]*
 
-Probamos Defiéndelo con **[N] estudiantes** y **[N] profesores** de **[carrera y universidad]**.
-
-| Quién | Qué probó | Cita textual | Dato medido | Qué cambiamos por esto |
-|---|---|---|---|---|
-| Estudiante 1 | | | | |
-| Profesor 1 | | | | |
+Probamos Defiéndelo con **1 estudiante** de **Ingeniería de telecomunicaciones**.
 
 ### La solución
 Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 minutos. El estudiante no responde a un examinador: **le enseña su trabajo a Carlos**, un compañero de IA que no lo entiende y que a veces se equivoca con mucha seguridad.
