@@ -131,7 +131,9 @@ Una sola llamada por turno mantiene el costo en centavos por defensa.
 ### Cómo se registra una entrega
 1. Al pulsar *Empezar* en modo **Entregar**, el navegador pide un intento a `POST /api/intentos`. El servidor rechaza ahí una segunda entrega con el mismo nombre (409) o una tarea cerrada (403), y fija qué trabajo se defiende.
    - **Hay un solo intento vigente por estudiante y tarea.** Si el estudiante ya había respondido algo y vuelve a empezar, se entrega lo que llevaba (marcado como *abandonada*) y no se abre otro. Un intento sin ninguna respuesta sí se puede reemplazar, y el anterior deja de servir.
-   - Salir con el botón *Salir* o cerrar la pestaña (el navegador avisa antes) también entrega lo respondido. Si el estudiante no vuelve, la entrega se cierra sola cuando el profesor abre su panel y lleva 20 minutos sin actividad.
+   - El botón *Salir* entrega en el acto lo respondido. Si el estudiante cierra la pestaña (el navegador avisa antes), la entrega se cierra cuando vuelve a empezar o, si no vuelve, cuando el profesor abre su panel y lleva 20 minutos sin actividad.
+   - Si sale mientras Carlos le repregunta, ese punto se entrega con la evaluación de su primera respuesta y queda marcado como *pendiente*.
+   - Solo se marca como *abandonada* si quedaron puntos sin responder. Si respondió todo y únicamente falló el envío final, la entrega cuenta como completa.
 2. Cada respuesta va a `/api/carlos` con ese intento. El servidor guarda la evaluación de cada punto y no deja volver a evaluarlo: un punto admite una respuesta y, como mucho, una repregunta. Si el navegador repite la petición (por ejemplo, porque se perdió la respuesta), recibe lo que ya se registró.
 3. Al terminar, `POST /api/sesiones` solo envía el intento y las señales que únicamente el navegador puede ver (salidas de la pestaña, intentos de pegar y de captura). El reporte del profesor se arma **con lo registrado en el servidor**. Un punto sin registro, por ejemplo porque se evaluó sin conexión, cuenta como rojo y queda marcado para revisión. La entrega se marca de forma atómica: dos cierres simultáneos guardan una sola sesión.
 
@@ -276,14 +278,18 @@ En `.env` (local) o en las variables de entorno de Vercel:
 | `LLM_API_KEY` | Clave del proveedor |
 | `LLM_MODEL` | Nombre exacto del modelo. Usamos `gemini-flash-lite-latest`: los modelos más lentos pueden superar el tiempo límite al generar los puntos de un documento |
 | `LLM_BASE_URL` | Solo para `openai-compatible` |
-| `LIMITE_<NOMBRE>_IP` / `LIMITE_<NOMBRE>_GLOBAL` | Opcional: cambia los límites por minuto (`CARLOS`, `INTENTOS`, `DOCUMENTOS`, `ARCHIVOS`, `TAREAS`) |
-| `CONFIAR_PROXY` | Opcional: `1` para usar `x-forwarded-for` detrás de un proxy propio (en Vercel no hace falta) |
 | `LLM_MODEL_RESPALDO` | Solo para `gemini`: modelo que se usa si `LLM_MODEL` responde 404 (por ejemplo, porque se retiró). Por defecto, `gemini-flash-lite-latest` |
 
 ### Reportes de la demo
 | Variable | Valor |
 |---|---|
 | `DEMO_TOKEN_PROFESOR` | Token para ver los reportes de `DEMO-01`. Sin esta variable, esos reportes quedan cerrados |
+
+### Límites de uso (opcional)
+| Variable | Valor |
+|---|---|
+| `LIMITE_<NOMBRE>_IP` / `LIMITE_<NOMBRE>_GLOBAL` | Cambia los límites por minuto (`CARLOS`, `INTENTOS`, `DOCUMENTOS`, `ARCHIVOS`, `TAREAS`). Ver la tabla en *Seguridad* |
+| `CONFIAR_PROXY` | `1` para usar `x-forwarded-for` detrás de un proxy propio (en Vercel no hace falta) |
 
 ### Guardar los datos (recomendado en Vercel)
 Crea una base Redis gratuita en [Upstash](https://upstash.com) y agrega:

@@ -277,12 +277,16 @@ async function empezar() {
     const textoBoton = boton.textContent;
     boton.disabled = true;
     try {
+      // Primero se abre el intento: si ya entregó o la tarea está cerrada, no se gasta IA en dudas nuevas.
+      S.intento = await abrirIntento();
       if (S.casoUsado && window.renovarCasoEntrega) {
         boton.textContent = 'Carlos prepara dudas nuevas…';
         await window.renovarCasoEntrega();
+        // El intento recién abierto no tiene respuestas, así que se reemplaza por uno con el trabajo nuevo.
+        S.intento = await abrirIntento();
       }
-      S.intento = await abrirIntento();
     } catch (err) {
+      S.intento = null;
       $('nombre-err').textContent = err.message;
       return;
     } finally {
@@ -292,7 +296,7 @@ async function empezar() {
   }
   S.casoUsado = true;
   S.respuesta = document.querySelector('input[name=respuesta]:checked').value;
-  S.i = 0; S.resultados = {}; S.t0 = Date.now();
+  S.i = 0; S.resultados = {}; S.t0 = Date.now(); S.respondio = false; S.entregaConfirmada = false;
   S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false };
   $('marca-agua').textContent = `${S.nombre} · ${S.tarea.codigo}   `.repeat(120);
   $('d-modo').textContent = S.modo === 'practica' ? 'ensayo' : 'entrega';
@@ -391,6 +395,7 @@ async function responder(texto) {
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw Object.assign(new Error(d.error || 'Carlos no respondió'), { status: res.status });
     r = d;
+    S.respondio = true; // el servidor ya registró algo de esta entrega
     leyo = !!r.leyo; dubitativo = !!r.dubitativo;
     if (r.iaCaida && !S.forzarSim) {
       S.senales.iaCaida = true; S.forzarSim = true;
@@ -531,16 +536,19 @@ $('b-cambiar').onclick = () => {
   if (S.respuesta === 'texto') $('resp').focus();
 };
 // Solo hay un intento: salir de una entrega con respuestas la entrega con lo que se respondió.
-const entregaEnCurso = () => S.modo === 'evaluacion' && S.intento && $('defensa').classList.contains('on') && Object.keys(S.resultados).length > 0;
+// Cuenta también un punto en repregunta (S.respondio) y el reporte final mientras no se confirme su envío.
+const enDefensaOReporte = () => $('defensa').classList.contains('on') || $('reporte').classList.contains('on');
+const entregaEnCurso = () => S.modo === 'evaluacion' && S.intento && S.respondio && !S.entregaConfirmada && enDefensaOReporte();
 $('b-salir').onclick = async () => {
   const aviso = S.modo !== 'evaluacion' ? '¿Salir del ensayo? Tu avance se pierde.'
-    : Object.keys(S.resultados).length ? '¿Salir de la entrega? Solo tienes un intento: tu profesor recibirá lo que llevas respondido y no podrás volver a empezar.'
+    : S.respondio ? '¿Salir de la entrega? Solo tienes un intento: tu profesor recibirá lo que llevas respondido y no podrás volver a empezar.'
       : '¿Salir de la entrega? Aún no respondiste nada, así que podrás empezarla de nuevo.';
   if (!window.confirm(aviso)) return;
   detenerMic();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   if (entregaEnCurso()) {
     try {
+      S.entregaConfirmada = true;
       await fetch('api/sesiones', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ modo: 'evaluacion', intento: S.intento, abandonada: true, senales: { pantallaOculta: S.senales.pantallaOculta, pegadoBloqueado: S.senales.pegadoBloqueado, captura: S.senales.captura } }),

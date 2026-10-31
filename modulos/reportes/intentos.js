@@ -93,13 +93,15 @@ export async function turnosDelPunto(intento, puntoId) {
 export async function reservarTurno(intento, puntoId) {
   const n = await incrementar(`turnos:${intento.id}:${puntoId}`, VIDA_CONTADOR);
   if (n > MAX_TURNOS_POR_PUNTO) throw errorHttp('Este punto ya fue evaluado en esta entrega.', 409);
+  return n;
 }
 
 export async function registrarEvaluacion(intento, puntoId, registro) {
   await agregar('evaluaciones:' + intento.id, { puntoId, ...registro, creado: new Date().toISOString() });
 }
 
-// El último registro final de cada punto. Un punto que quedó en repregunta no cuenta como evaluado.
+// La evaluación con la que cuenta cada punto respondido: la final, o, si el estudiante se fue mientras
+// Carlos le repreguntaba, la última que alcanzó a registrar (marcada como pendiente).
 export async function evaluacionesFinales(intento) {
   const porPunto = new Map();
   for (const e of await listar('evaluaciones:' + intento.id)) {
@@ -110,7 +112,7 @@ export async function evaluacionesFinales(intento) {
   const finales = new Map();
   for (const [pid, lista] of porPunto) {
     const final = lista.find((e) => e.final);
-    if (final) finales.set(pid, { final, turnos: lista });
+    finales.set(pid, { final: final || lista[lista.length - 1], turnos: final ? lista.slice(0, lista.indexOf(final) + 1) : lista, pendiente: !final });
   }
   return finales;
 }

@@ -121,6 +121,7 @@
       if (!res.ok) throw new Error(d.error || 'No se pudo registrar la sesión');
 
       sesionEnviadaT0 = S.t0;
+      S.entregaConfirmada = true; // ya no hace falta avisar al cerrar la pestaña
       if (nodoEstado) {
         nodoEstado.textContent = `Reporte recibido por tu profesor (registro ${d.id}). Tu trabajo marcado y tus respuestas quedaron guardados.`;
       }
@@ -392,6 +393,8 @@
     if (s.captura) alertas.push(`${s.captura} intento(s) de captura o impresión`);
     if (s.iaCaida) alertas.push('evaluada parcialmente en modo respaldo');
     if (s.abandonada) alertas.push('salió a mitad de la entrega: se cerró con lo que alcanzó a responder');
+    const pendientes = Object.values(ses.resultados || {}).filter((r) => r.pendiente).length;
+    if (pendientes) alertas.push(`${pendientes} punto(s) con una repregunta sin responder`);
     if (s.sinRegistro) alertas.push(`${s.sinRegistro} punto(s) sin evaluación registrada en el servidor (cuentan como rojo)`);
 
     if (alertas.length) {
@@ -575,7 +578,7 @@
       const t = String(v ?? '');
       return `"${(/^[=+\-@\t\r]/.test(t) ? "'" + t : t).replace(/"/g, '""')}"`;
     };
-    const cab = ['Estudiante', 'Nivel sugerido', 'Duracion (s)', 'Puntos verdes', 'Total puntos', 'Alertas totales', 'Leyo literal', 'Dubitativo', 'Salidas pestana', 'Pegado bloqueado', 'Capturas', 'Fecha ISO'];
+    const cab = ['Estudiante', 'Nivel sugerido', 'Duracion (s)', 'Puntos verdes', 'Total puntos', 'Alertas totales', 'Leyo literal', 'Dubitativo', 'Salidas pestana', 'Pegado bloqueado', 'Capturas', 'Salio a mitad', 'Puntos sin registro', 'Fecha ISO'];
     const filas = estadoPanel.sesiones.map((s) => {
       const pts = Object.values(s.resultados || {});
       const verdes = pts.filter((p) => p.nivel === 'verde').length;
@@ -592,6 +595,8 @@
         sen.pantallaOculta || 0,
         sen.pegadoBloqueado || 0,
         sen.captura || 0,
+        sen.abandonada ? 'si' : 'no',
+        sen.sinRegistro || 0,
         s.creada || '',
       ].map(esc).join(',');
     });
