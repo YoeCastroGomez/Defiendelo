@@ -146,7 +146,7 @@ function hablar(texto, esPregunta = false) {
   u.lang = 'es-PE';
   const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.toLowerCase().startsWith('es'));
   if (v) u.voice = v;
-  u.rate = 1.05;
+  u.rate = 1.10;
   let arrancado = false;
   const alTerminarHablar = () => {
     $('av-carlos')?.classList.remove('hablando');
