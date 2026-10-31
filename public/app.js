@@ -172,18 +172,36 @@ function fonetizarParaVoz(t) {
   return res;
 }
 
-function buscarMejorVozEspanol() {
-  if (!('speechSynthesis' in window)) return null;
+let vozLatina = null;
+
+function seleccionarVozLatina() {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
   const voces = speechSynthesis.getVoices();
-  if (!voces.length) return null;
-  // 1. Preferir voz de Perú si el navegador la tiene disponible
-  const pe = voces.find((v) => /es[-_]PE/i.test(v.lang));
-  if (pe) return pe;
-  // 2. Preferir voces latinoamericanas (evita que la 'V' se pronuncie como 'uve' en voces de España)
-  const latam = voces.find((v) => /es[-_](419|mx|us|co|cl|ar)/i.test(v.lang));
-  if (latam) return latam;
-  // 3. Cualquier otra voz en español
-  return voces.find((v) => v.lang && v.lang.toLowerCase().startsWith('es')) || null;
+  if (!voces || !voces.length) return null;
+
+  // 1. Voz específica de Perú si existe en el sistema
+  let v = voces.find((x) => /es[-_]PE/i.test(x.lang) || /per[uú]/i.test(x.name));
+
+  // 2. Voz de español latinoamericano (Google español de Estados Unidos es-US, es-419, es-MX, etc.)
+  if (!v) {
+    // Si hay opción masculina en español latino, elegirla para Carlos
+    v = voces.find((x) => (/es[-_](419|us|mx|co|cl|ar)/i.test(x.lang) || /estados unidos|m[eé]xico|colombia|latino/i.test(x.name)) && /raul|jorge|diego|carlos|hombre|male/i.test(x.name));
+  }
+  if (!v) {
+    v = voces.find((x) => /es[-_](419|us|mx|co|cl|ar)/i.test(x.lang) || /estados unidos|m[eé]xico|colombia|latino/i.test(x.name));
+  }
+
+  // 3. Respaldo: cualquier voz en español
+  if (!v) {
+    v = voces.find((x) => x.lang && x.lang.toLowerCase().startsWith('es'));
+  }
+  vozLatina = v || null;
+  return vozLatina;
+}
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  seleccionarVozLatina();
+  speechSynthesis.onvoiceschanged = () => { seleccionarVozLatina(); };
 }
 
 function hablar(texto, esPregunta = false) {
@@ -195,8 +213,8 @@ function hablar(texto, esPregunta = false) {
   speechSynthesis.cancel();
   const textoVoz = fonetizarParaVoz(texto);
   const u = new SpeechSynthesisUtterance(textoVoz);
-  u.lang = 'es-PE';
-  const v = buscarMejorVozEspanol();
+  u.lang = 'es-419'; // Estándar para español latinoamericano
+  const v = vozLatina || seleccionarVozLatina();
   if (v) {
     u.voice = v;
     if (v.lang) u.lang = v.lang;
