@@ -6,6 +6,7 @@ import { guardar, persistente } from '../compartido/almacen.js';
 import { generarCaso, MIN_PALABRAS, MAX_PALABRAS } from '../modulos/documentos/generador.js';
 import { proveedorConfigurado } from '../compartido/llm.js';
 import { obtenerTareaInterna } from '../modulos/tareas/tareas.js';
+import { limpiarArchivo } from '../compartido/archivos.js';
 
 const nuevoCasoId = () => 'doc-' + randomBytes(5).toString('hex');
 const limpio = (v, max) => String(v || '').trim().slice(0, max);
@@ -38,6 +39,7 @@ export default async function handler(req, res) {
     }
 
     const { caso } = await generarCaso({ ...datos, id: nuevoCasoId() });
+    caso.archivo = limpiarArchivo(b.archivo, 'resolucion');
     // `guardar` no sobrescribe: si el id ya estaba tomado, se reetiqueta el caso y se reintenta.
     for (let k = 0; k < 5; k++) {
       if (await guardar('caso:' + caso.id, caso)) {

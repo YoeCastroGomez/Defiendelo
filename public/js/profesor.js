@@ -350,6 +350,26 @@
     });
   }
 
+  function prepararDescarga(ses) {
+    const b = $('b-bajar-entrega');
+    b.classList.toggle('oculto', !/^doc-/.test(ses.casoId || ''));
+    b.disabled = false;
+    b.textContent = 'Descargar archivo original';
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const q = new URLSearchParams({ codigo: estadoPanel.tarea.codigo, casoId: ses.casoId });
+        const r = await fetch('api/archivos?' + q, { headers: { 'x-token-profesor': ($('p-token').value || '').trim() } });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error);
+        location.href = d.url;
+        b.disabled = false;
+      } catch (e) {
+        b.textContent = e.message || 'No se pudo descargar. Intenta de nuevo.';
+      }
+    };
+  }
+
   async function seleccionarSesion(idSesion) {
     const ses = estadoPanel.sesiones.find((s) => s.id === idSesion);
     if (!ses) return;
@@ -358,6 +378,7 @@
 
     const fecha = ses.creada ? new Date(ses.creada).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '';
     $('p-doc-meta').textContent = `${ses.nombre} · ${formatearDuracion(ses.duracionSegundos)}${fecha ? ' · ' + fecha : ''}`;
+    prepararDescarga(ses);
     $('p-det-nivel').className = 'chip ' + (ses.nivelGeneral || '');
     $('p-det-nivel').textContent = (ETIQUETA_NIVEL[ses.nivelGeneral] || 'Nivel') + ' sugerido';
 

@@ -4,7 +4,7 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 
-const VARIABLES = ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL', 'LLM_BASE_URL', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'DEMO_TOKEN_PROFESOR'];
+const VARIABLES = ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL', 'LLM_BASE_URL', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'DEMO_TOKEN_PROFESOR', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SUPABASE_BUCKET'];
 for (const v of VARIABLES) delete process.env[v];
 
 const almacen = await import('../compartido/almacen.js');
@@ -13,6 +13,7 @@ const { default: apiCasos } = await import('../api/casos.js');
 const { default: apiCarlos } = await import('../api/carlos.js');
 const { default: apiSesiones } = await import('../api/sesiones.js');
 const { default: apiDocumentos } = await import('../api/documentos.js');
+const { default: apiArchivos } = await import('../api/archivos.js');
 
 async function llamar(handler, { method = 'GET', query = {}, body, headers = {}, ip = '10.0.0.1' } = {}) {
   const salida = { status: 200, json: undefined };
@@ -264,6 +265,78 @@ describe('/api/sesiones', () => {
     assert.equal(r.status, 200);
     assert.deepEqual(r.json.sesiones.map((s) => s.nombre), ['Segunda', 'Primera']);
     assert.equal(JSON.stringify(r.json).includes(tokenProfesor), false);
+  });
+});
+
+describe('/api/archivos', () => {
+  const RUTA_ENUNCIADO = 'enunciados/' + 'a'.repeat(32) + '.pdf';
+  const RUTA_ENTREGA = 'resoluciones/' + 'b'.repeat(32) + '.docx';
+  const texto = Array.from({ length: 300 }, (_, k) => `palabra${k}${k % 12 === 11 ? '.' : ''}`).join(' ');
+  let fetchOriginal;
+
+  beforeEach(() => {
+    fetchOriginal = globalThis.fetch;
+    process.env.SUPABASE_URL = 'https://prueba.supabase.co';
+    process.env.SUPABASE_SERVICE_KEY = 'clave-secreta';
+    process.env.SUPABASE_BUCKET = 'cubeta';
+    globalThis.fetch = async (url) => new Response(JSON.stringify(
+      String(url).includes('/upload/sign/') ? { url: '/object/upload/sign/cubeta/x?token=s' } : { signedURL: '/object/sign/cubeta/x?token=d' },
+    ), { status: 200 });
+  });
+  afterEach(() => {
+    globalThis.fetch = fetchOriginal;
+    for (const v of ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SUPABASE_BUCKET']) delete process.env[v];
+  });
+
+  test('POST valida el formato y el tamaño, y nunca devuelve la clave', async () => {
+    const pedir = (body) => llamar(apiArchivos, { method: 'POST', body, ip: otraIp() });
+    assert.equal((await pedir({ tipo: 'enunciado', nombre: 'a.png', tamano: 10 })).status, 400);
+    assert.equal((await pedir({ tipo: 'enunciado', nombre: 'a.pdf', tamano: 11 * 1024 * 1024 })).status, 400);
+    assert.equal((await pedir({ tipo: 'otro', nombre: 'a.pdf', tamano: 10 })).status, 400);
+    const r = await pedir({ tipo: 'resolucion', nombre: 'Mi Tarea.DOCX', tamano: 10 });
+    assert.equal(r.status, 201);
+    assert.match(r.json.ruta, /^resoluciones\/[0-9a-f]{32}\.docx$/);
+    assert.equal(JSON.stringify(r.json).includes('clave-secreta'), false);
+  });
+
+  test('sin configuración responde 503', async () => {
+    delete process.env.SUPABASE_URL;
+    assert.equal((await llamar(apiArchivos, { method: 'POST', body: { tipo: 'enunciado', nombre: 'a.pdf', tamano: 10 }, ip: otraIp() })).status, 503);
+  });
+
+  test('el enunciado se baja con el código y no expone su ruta', async () => {
+    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivo: { ruta: RUTA_ENUNCIADO, nombre: 'Guía' } } });
+    const { codigo } = creada.json;
+    const publica = await llamar(apiTareas, { query: { codigo } });
+    assert.equal(publica.json.enunciadoDescargable, true);
+    assert.equal(JSON.stringify(publica.json).includes(RUTA_ENUNCIADO), false);
+    const r = await llamar(apiArchivos, { query: { codigo } });
+    assert.equal(r.status, 200);
+    assert.match(r.json.url, /download=Gu%C3%ADa\.pdf$/);
+  });
+
+  test('una ruta inventada por el cliente se descarta', async () => {
+    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivo: { ruta: '../secreto.pdf', nombre: 'x' } } });
+    assert.equal((await llamar(apiArchivos, { query: { codigo: creada.json.codigo } })).status, 404);
+  });
+
+  test('la entrega solo la baja el profesor de esa tarea', async () => {
+    const crear = async () => (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante' } })).json;
+    const propia = await crear();
+    const ajena = await crear();
+    const doc = await llamar(apiDocumentos, { method: 'POST', body: { codigo: propia.codigo, titulo: 'R', texto, archivo: { ruta: RUTA_ENTREGA, nombre: 'Tarea.docx' } } });
+    const { casoId } = doc.json;
+    await llamar(apiSesiones, { method: 'POST', body: { codigo: propia.codigo, casoId, nombre: 'Ana', modo: 'evaluacion', resultados: { p1: { nivel: 'verde' } } } });
+
+    const publico = await llamar(apiCasos, { query: { id: casoId } });
+    assert.equal(JSON.stringify(publico.json).includes(RUTA_ENTREGA), false);
+
+    const bajar = (t) => llamar(apiArchivos, { query: { codigo: t.codigo, casoId }, headers: { 'x-token-profesor': t.tokenProfesor } });
+    assert.equal((await llamar(apiArchivos, { query: { codigo: propia.codigo, casoId } })).status, 401);
+    assert.equal((await bajar(ajena)).status, 404);
+    const ok = await bajar(propia);
+    assert.equal(ok.status, 200);
+    assert.match(ok.json.url, /download=Tarea\.docx$/);
   });
 });
 
