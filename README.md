@@ -41,7 +41,7 @@ Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 
    - **Evaluación calificada:** al vencer la fecha límite nadie puede empezar a entregar. Quien ya había empezado puede terminar, y su entrega queda marcada *fuera de plazo* para que el profesor decida.
    - **Práctica:** la fecha es de referencia. Se puede entregar después, pero la entrega queda marcada *fuera de plazo*.
 2. Elige qué defenderán sus estudiantes, y el formulario muestra solo la caja que corresponde:
-   - **Su propia tarea** (cada estudiante sube su resolución): una sola caja de **material** para guías, rúbricas, plantillas y teoría, hasta 10 archivos. El profesor indica qué es cada uno: las guías y plantillas le dicen a Carlos qué se pidió, y la teoría le da contexto del curso.
+   - **Su propia tarea** (cada estudiante sube su resolución): una sola caja de **material** para guías, rúbricas, plantillas y teoría, hasta 10 archivos. El profesor no tiene que clasificarlos: la app separa por el nombre del archivo las guías y plantillas (le dicen a Carlos qué se pidió) de la teoría (le da contexto del curso).
    - **Un documento que el profesor les da** (una lectura, un caso): una caja para subir ese documento. Todos lo estudian y lo defienden; nadie sube nada.
 3. Comparte el código con la clase, o el enlace directo `…/?codigo=KXS-3NT`.
 4. El **estudiante** ingresa el código, lee las instrucciones y la teoría, escribe su nombre y elige el modo. Si la tarea lo pide, sube su resolución en `.pdf` o `.docx` (hasta 10 MB) o pega su texto.
