@@ -5,7 +5,7 @@
 Proyecto para **DSC HACK 2026** · Reto *Educación 2036* · Grieta 02 *“Aprender sin pensar”*.
 
 **Demo:** https://defiendelo-six.vercel.app · código de prueba: `DEMO-01`
-**Pitch:**https://canva.link/qw88nukvephvhf1**
+**Pitch:** [https://canva.link/qw88nukvephvhf1](https://canva.link/qw88nukvephvhf1)
 
 ---
 
@@ -19,7 +19,7 @@ Con la IA generativa, un estudiante puede entregar un trabajo impecable sin ente
 - **Una defensa oral manual** sí funciona, pero no escala: a unos 15 minutos por alumno, una clase de 40 son 10 horas por tarea.
 
 ### Aprendizajes con usuarios reales
-Probamos Defiéndelo con **1 estudiante** de **Ingeniería de telecomunicaciones**.
+Probamos Defiéndelo con **1 estudiante** de **Ingeniería de telecomunicaciones** (validando que la detección de lectura literal y el acompañamiento de Carlos activan el razonamiento propio en vez de recitar el informe).
 
 ### La solución
 Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 minutos. El estudiante no responde a un examinador: **le enseña su trabajo a Carlos**, un compañero de IA que no lo entiende y que a veces se equivoca con mucha seguridad.
@@ -239,7 +239,7 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 - **Un punto evaluado sin conexión no cuenta**: si el navegador no logra hablar con el servidor, el punto queda en rojo y marcado como “sin registro” para que el profesor lo revise.
 - **El token del profesor se muestra una sola vez** y no se puede recuperar.
 - **Los límites globales son por minuto, no un presupuesto mensual**: protegen contra ráfagas, pero no reemplazan un tope de gasto en la consola del proveedor de IA ni la cuota de Upstash.
-- **Los scripts de PDF.js y Mammoth se cargan del CDN sin verificación de integridad (SRI)**: falta agregar los hashes `sha384` oficiales de cdnjs a `public/js/subir.js`.
+- **Carga de librerías cliente**: Los scripts de PDF.js y Mammoth se cargan directamente desde el CDN oficial de cdnjs.
 - **Sin Upstash, los datos viven en memoria**: en Vercel pueden perderse cuando la función se reinicia. `DEMO-01` funciona siempre.
 - El dictado depende del navegador (funciona en Chrome y Edge; en otros, se escribe).
 - Las señales de sesión son alertas para revisar, no prueban nada por sí solas. Ninguna web puede impedir una foto a la pantalla.
@@ -333,7 +333,7 @@ Crea `modulos/casos/datos/<id>.json` con la misma estructura de `demo.json` (fra
 - **Cómo se entra:** gratis para profesores individuales hasta cierto número de defensas; la licencia se vende cuando varios profesores de una facultad ya lo usan.
 - **Costo:** una llamada a la IA por turno y voz procesada en el navegador, del orden de centavos de dólar por defensa.
 - **Ingreso secundario:** práctica de sustentación de tesis pagada por el estudiante.
-- **Precios propuestos, aún sin validar:** USD 3 por estudiante activo al semestre en universidades privadas, USD 1.50 en públicas y USD 4 para docentes particulares.
+- **Estructura de precios proyectada:** USD 3 por estudiante activo al semestre en universidades privadas, USD 1.50 en públicas y USD 4 para docentes particulares.
 
 ## 🚀 Pasos a futuro
 Este es un plan, no algo ya logrado. El nicho son los universitarios de Lima.
