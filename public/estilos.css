@@ -14,7 +14,10 @@ h1,h2,p{margin:0}
 :focus-visible{outline:3px solid var(--amarillo);outline-offset:2px}
 
 .top{display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:space-between;padding:14px clamp(16px,3vw,32px);background:var(--hoja);border-bottom:1px solid var(--linea)}
-.marca{font-family:var(--mono);font-weight:500;font-size:16px;letter-spacing:-.2px}
+.marca{display:inline-flex;align-items:center;gap:9px;font-family:var(--sans);font-weight:700;font-size:16.5px;letter-spacing:-.3px;color:var(--tinta);text-decoration:none;user-select:none;line-height:1}
+.marca:hover{opacity:.85}
+.marca:focus-visible{border-radius:6px}
+.marca-logo{width:22px;height:22px;flex-shrink:0;color:var(--tinta);display:inline-block;vertical-align:middle}
 .cur{color:var(--verde)}
 .tarjeta{background:var(--hoja);border:1px solid var(--linea);border-radius:12px;padding:22px}
 .tarjeta.oscura{background:var(--osc);border-color:var(--osc);color:var(--osc-txt)}
@@ -119,6 +122,19 @@ textarea::placeholder{color:#7D8086}
 .tarjeta.oscura p{color:#D3D5D9}
 .tarjeta.oscura h2{color:#fff}
 .r-item.activo{background:#FFFBEA;margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:6px}
+.guia-repaso{display:flex;flex-direction:column;gap:12px;margin:12px 0}
+.guia-item{padding:12px;border-radius:8px;background:var(--osc2);border-left:3px solid var(--amarillo);display:flex;flex-direction:column;gap:6px}
+.guia-item.rojo{border-left-color:var(--rojo)}
+.guia-item.amarillo{border-left-color:var(--amarillo)}
+.guia-item.verde{border-left-color:var(--verde)}
+.guia-item-tit{font-weight:600;font-size:13.5px;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.guia-item-txt{font-size:12.5px;color:var(--osc-suave);line-height:1.45}
+.guia-item-tip{font-size:12px;color:var(--amarillo);background:rgba(233,198,75,.08);padding:6px 8px;border-radius:4px;line-height:1.4}
+.guia-alertas{display:flex;flex-direction:column;gap:6px;margin:10px 0;padding:10px;border-radius:8px;background:rgba(255,255,255,.05);font-size:12px;color:#E0E2E6}
+.chip-tiempo{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;background:var(--osc2);color:var(--amarillo);font-size:12px;font-weight:500;transition:all .2s ease}
+.chip-tiempo.urgente{background:rgba(147,58,44,.35);color:#FF6B6B;animation:pulsoUrgente 1s infinite}
+.chip-tiempo.activo{background:rgba(29,107,78,.35);color:#5CE6B0}
+@keyframes pulsoUrgente{0%,100%{opacity:1}50%{opacity:.5}}
 
 /* protección contra capturas */
 #marca-agua,#velo{display:none;position:fixed;inset:0;z-index:50}
@@ -197,9 +213,12 @@ details.dialogo-limpio summary{font-family:var(--mono);font-size:12px;color:var(
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* ---------- navegación y modo de respuesta ---------- */
-.top-izq{display:flex;align-items:center;gap:16px;min-width:0}
-.volver{padding:6px 0;border:0;background:none;color:var(--tinta2);font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
-.volver:hover{color:var(--tinta);text-decoration:underline}
+.top-izq{display:flex;align-items:center;gap:12px;min-width:0}
+.btn-volver,.volver{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border:1px solid var(--linea);border-radius:8px;background:var(--hoja);color:var(--tinta2);font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background .15s ease,border-color .15s ease,color .15s ease,transform .1s ease;line-height:1}
+.btn-volver:hover,.volver:hover{background:var(--linea2);border-color:#CFCFCA;color:var(--tinta);text-decoration:none}
+.btn-volver:active,.volver:active{transform:scale(.98)}
+.btn-volver .icono-volver,.volver .icono-volver{width:15px;height:15px;flex-shrink:0;transition:transform .15s ease;display:inline-block;vertical-align:middle}
+.btn-volver:hover .icono-volver,.volver:hover .icono-volver{transform:translateX(-2px)}
 .opcion.deshabilitada{opacity:.65;cursor:default}
 #inicio .inicio{align-items:flex-start}
 #inicio .hero{position:sticky;top:24px}

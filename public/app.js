@@ -1,4 +1,117 @@
-/* Defiéndelo — cliente. Sin dependencias. */
+  if (S.tipo === 'practica' || S.modo === 'practica') {
+    if (pend.length === 0) {
+      h.textContent = '¡Práctica superada: explicaste todos los puntos!';
+      t.textContent = esTrabajoPropio
+        ? 'Explicaste todos los puntos de tu trabajo con argumentos sólidos y convenciste a Carlos. Puedes rendir la práctica otra vez o consultar con tu profesor.'
+        : 'Explicaste todos los puntos del documento común con claridad y convenciste a Carlos. Puedes rendir la práctica otra vez.';
+      b.textContent = 'Rendir otra vez';
+      b.onclick = () => mostrar('inicio');
+      const bRe = document.createElement('button');
+      bRe.className = 'btn claro';
+      bRe.type = 'button';
+      bRe.textContent = 'Repetir ahora';
+      bRe.onclick = () => { empezar(); };
+      const fBotones = document.createElement('div');
+      fBotones.className = 'fila';
+      fBotones.style.marginTop = '14px';
+      fBotones.append(b, bRe);
+      sig.append(h, t, fBotones);
+    } else {
+      h.textContent = `Aspectos a repasar (${pend.length} de ${ps.length} pendientes)`;
+      t.textContent = esTrabajoPropio
+        ? 'Carlos encontró dudas en tus explicaciones sobre tu trabajo. Revisa estos puntos en tu informe antes de volver a rendir:'
+        : 'Carlos encontró dudas en tu comprensión del texto común. Revisa estos puntos en el documento antes de volver a rendir:';
+
+      const guia = document.createElement('div');
+      guia.className = 'guia-repaso';
+
+      pend.forEach((p) => {
+        const res = S.resultados[p.id];
+        const item = document.createElement('div');
+        item.className = 'guia-item ' + (res.nivel === 'rojo' ? 'rojo' : 'amarillo');
+
+        const tit = document.createElement('div');
+        tit.className = 'guia-item-tit';
+        const tagNivel = res.nivel === 'rojo' ? 'No superado' : 'A reforzar';
+        tit.innerHTML = `<span>${p.tema}</span><span class="chip ${res.nivel}">${tagNivel}</span>`;
+
+        const duda = document.createElement('div');
+        duda.className = 'guia-item-txt';
+        duda.innerHTML = `<b>Lo que preguntó Carlos:</b> ${corta(p.apertura, 130)}`;
+
+        const motivo = document.createElement('div');
+        motivo.className = 'guia-item-txt';
+        motivo.innerHTML = `<b>Por qué no convenció:</b> ${res.motivo || 'Faltó mayor profundidad o claridad técnica.'}`;
+
+        const tip = document.createElement('div');
+        tip.className = 'guia-item-tip';
+        let consejo = '';
+        if (p.tipo === 'trampa') {
+          consejo = 'Carlos intentó confundirte con una premisa errónea. No aceptes el error por cortesía: identifica la falla y corrígela con argumentos firmes.';
+        } else if (p.tipo === 'condicion') {
+          consejo = 'Carlos te cambió las condiciones o requisitos. Explica paso a paso cómo se adapta la propuesta sin romper lo que diseñaste antes.';
+        } else {
+          consejo = 'Fundamenta el porqué: explica las ventajas técnicas de esta decisión y por qué es superior a otras alternativas.';
+        }
+        if (esTrabajoPropio) {
+          consejo += ' Revisa en tu informe la sección resaltada y ten claras tus decisiones de diseño.';
+        } else {
+          consejo += ' Revisa el párrafo del documento del profesor para respaldar tu respuesta con las ideas del autor.';
+        }
+        if (res.leyo) {
+          consejo += ' Traduce la idea a tus propias palabras en vez de leer el texto.';
+        }
+        if (res.dubitativo) {
+          consejo += ' Responde con seguridad; evita muletillas como "creo que" o "tal vez".';
+        }
+        tip.textContent = '💡 Recomendación: ' + consejo;
+
+        item.append(tit, duda, motivo, tip);
+        guia.appendChild(item);
+      });
+
+      const alertas = [];
+      if (S.senales.leyo) alertas.push(`📖 Se detectó lectura casi literal en ${S.senales.leyo} punto(s). En la entrega, explica con tus propias palabras.`);
+      if (S.senales.dubitativo) alertas.push(`🤔 Usaste lenguaje dubitativo en ${S.senales.dubitativo} respuesta(s). Argumenta con mayor convicción.`);
+      if (S.senales.tiempoAgotado) alertas.push(`⏱️ En ${S.senales.tiempoAgotado} pregunta(s) se agotaron los 30 s para empezar a responder. Arranca con tu idea de inmediato.`);
+
+      let cAlertas = null;
+      if (alertas.length) {
+        cAlertas = document.createElement('div');
+        cAlertas.className = 'guia-alertas';
+        alertas.forEach((al) => {
+          const pa = document.createElement('div');
+          pa.textContent = al;
+          cAlertas.appendChild(pa);
+        });
+      }
+
+      b.textContent = 'Rendir otra vez';
+      b.onclick = () => mostrar('inicio');
+
+      const bRepetir = document.createElement('button');
+      bRepetir.className = 'btn claro';
+      bRepetir.type = 'button';
+      bRepetir.textContent = 'Repetir de inmediato';
+      bRepetir.onclick = () => { empezar(); };
+
+      const fBotones = document.createElement('div');
+      fBotones.className = 'fila';
+      fBotones.style.marginTop = '14px';
+      fBotones.append(b, bRepetir);
+
+      sig.append(h, t);
+      if (cAlertas) sig.append(cAlertas);
+      sig.append(guia, fBotones);
+    }
+  } else {
+    h.textContent = 'Reporte para el profesor';
+    t.id = 'r-estado-envio';
+    t.textContent = 'Enviando tu reporte y trabajo marcado al profesor…';
+    b.textContent = 'Volver al inicio';
+    b.onclick = () => mostrar('rol');
+    sig.append(h, t, b);
+  }/* Defiendelo — cliente. Sin dependencias. */
 'use strict';
 const $ = (id) => document.getElementById(id);
 
@@ -73,18 +186,92 @@ const ERRORES_MIC = {
   network: 'El dictado de este navegador no está disponible. Usa Chrome o Edge, o escribe tu respuesta.',
   'no-speech': 'No se escuchó nada. Revisa tu micrófono y pulsa Hablar otra vez.',
 };
-function hablar(texto) {
+const LIMITE_RESPUESTA_SEG = 30;
+let timerInicioRespuesta = null;
+let segundosRestantesResp = LIMITE_RESPUESTA_SEG;
+let respuestaIniciada = false;
+
+function iniciarTemporizadorRespuesta() {
+  detenerTemporizadorRespuesta(false);
+  if ($('d-controles')?.classList.contains('oculto') || $('resp')?.disabled) return;
+  respuestaIniciada = false;
+  segundosRestantesResp = LIMITE_RESPUESTA_SEG;
+  const chip = $('d-tiempo-resp');
+  if (!chip) return;
+  chip.textContent = '⏱ ' + segundosRestantesResp + 's para responder';
+  chip.className = 'mono chico chip-tiempo';
+  chip.classList.remove('oculto');
+
+  timerInicioRespuesta = setInterval(() => {
+    segundosRestantesResp--;
+    if (segundosRestantesResp <= 10 && segundosRestantesResp > 0) {
+      chip.classList.add('urgente');
+    }
+    if (segundosRestantesResp > 0) {
+      chip.textContent = '⏱ ' + segundosRestantesResp + 's para responder';
+    } else {
+      clearInterval(timerInicioRespuesta);
+      timerInicioRespuesta = null;
+      chip.textContent = '⏱ Tiempo agotado';
+      chip.className = 'mono chico chip-tiempo urgente';
+      S.senales.tiempoAgotado = (S.senales.tiempoAgotado || 0) + 1;
+      $('d-aviso').textContent = 'Se agotaron los 30 segundos para comenzar a responder.';
+      responder('No sé. Se me acabaron los 30 segundos para empezar a responder.');
+    }
+  }, 1000);
+}
+
+function marcarInicioRespuesta() {
+  if (respuestaIniciada) return;
+  respuestaIniciada = true;
+  if (timerInicioRespuesta) {
+    clearInterval(timerInicioRespuesta);
+    timerInicioRespuesta = null;
+  }
+  const chip = $('d-tiempo-resp');
+  if (!chip) return;
+  chip.className = 'mono chico chip-tiempo activo';
+  chip.textContent = grabando ? '● Grabando...' : '✓ Respondiendo';
+}
+
+function detenerTemporizadorRespuesta(iniciado) {
+  if (timerInicioRespuesta) {
+    clearInterval(timerInicioRespuesta);
+    timerInicioRespuesta = null;
+  }
+  const chip = $('d-tiempo-resp');
+  if (!chip) return;
+  if (iniciado) {
+    marcarInicioRespuesta();
+  } else {
+    chip.classList.add('oculto');
+  }
+}
+
+function hablar(texto, esPregunta = false) {
   $('av-carlos')?.classList.remove('hablando');
-  if (!$('c-voz').checked || !('speechSynthesis' in window)) return;
+  if (!$('c-voz').checked || !('speechSynthesis' in window)) {
+    if (esPregunta) iniciarTemporizadorRespuesta();
+    return;
+  }
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(texto);
   u.lang = 'es-PE';
   const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.toLowerCase().startsWith('es'));
   if (v) u.voice = v;
   u.rate = 1.05;
+  let arrancado = false;
+  const alTerminarHablar = () => {
+    $('av-carlos')?.classList.remove('hablando');
+    if (!arrancado) {
+      arrancado = true;
+      if (esPregunta) iniciarTemporizadorRespuesta();
+    }
+  };
   u.onstart = () => $('av-carlos')?.classList.add('hablando');
-  u.onend = () => $('av-carlos')?.classList.remove('hablando');
-  u.onerror = () => $('av-carlos')?.classList.remove('hablando');
+  u.onend = alTerminarHablar;
+  u.onerror = alTerminarHablar;
+  setTimeout(() => { if (!arrancado && $('av-carlos')?.classList.contains('hablando')) alTerminarHablar(); }, Math.max(5000, texto.length * 90));
   speechSynthesis.speak(u);
 }
 function toggleMic() {
@@ -95,6 +282,7 @@ function toggleMic() {
   rec.lang = 'es-PE'; rec.continuous = true; rec.interimResults = true;
   base = $('resp').value ? $('resp').value.trim() + ' ' : '';
   rec.onresult = (e) => {
+    marcarInicioRespuesta();
     let fin = '', tmp = '';
     for (let k = 0; k < e.results.length; k++) {
       (e.results[k].isFinal ? (fin += e.results[k][0].transcript) : (tmp += e.results[k][0].transcript));
@@ -105,6 +293,7 @@ function toggleMic() {
   rec.onend = () => { grabando = false; $('b-mic').textContent = '● Hablar'; $('b-mic').classList.remove('grabando'); if ($('d-aviso').textContent === ESCUCHANDO) $('d-aviso').textContent = ''; };
   rec.onerror = (e) => { $('d-aviso').textContent = ERRORES_MIC[e.error] || 'No se pudo usar el micrófono. Puedes escribir tu respuesta.'; };
   rec.start();
+  marcarInicioRespuesta();
   grabando = true; $('b-mic').textContent = '■ Detener'; $('b-mic').classList.add('grabando');
   $('d-aviso').textContent = ESCUCHANDO;
 }
@@ -356,7 +545,7 @@ async function empezar() {
   S.casoUsado = true;
   S.respuesta = document.querySelector('input[name=respuesta]:checked').value;
   S.i = 0; S.resultados = {}; S.t0 = Date.now(); S.respondio = false; S.entregaConfirmada = false;
-  S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false };
+  S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false, tiempoAgotado: 0 };
   $('marca-agua').textContent = `${S.nombre} · ${S.tarea.codigo}   `.repeat(120);
   $('d-modo').textContent = S.tipo === 'practica' ? 'práctica' : 'evaluación';
   $('d-titulo').textContent = S.caso.documento.titulo;
@@ -379,7 +568,7 @@ function progreso() {
     $('progreso').appendChild(li);
   });
 }
-function decir(texto) { $('d-dice').classList.remove('pensando'); $('d-dice').textContent = texto; hablar(texto); }
+function decir(texto, esPregunta = false) { $('d-dice').classList.remove('pensando'); $('d-dice').textContent = texto; hablar(texto, esPregunta); }
 function abrirPunto() {
   const p = punto();
   const tp = tipoPunto(p);
@@ -392,7 +581,7 @@ function abrirPunto() {
   modoRespuesta(true);
   pintarDoc($('d-doc'), { senalado: p.fragmento });
   progreso();
-  decir(p.apertura);
+  decir(p.apertura, true);
   // Desplaza solo el panel del documento (no la página) hasta lo que señala Carlos.
   const f = $(p.fragmento), caja = document.querySelector('.defensa .doc');
   if (f && caja.scrollHeight > caja.clientHeight) caja.scrollTo({ top: f.offsetTop - caja.clientHeight / 3, behavior: 'smooth' });
@@ -433,6 +622,7 @@ function simuladoBase(p, texto, leyo, dubitativo) {
 }
 
 async function responder(texto, via) {
+  detenerTemporizadorRespuesta(false);
   texto = (texto || '').trim();
   detenerMic();
   const p = punto();
@@ -489,14 +679,15 @@ async function responder(texto, via) {
     actualizarBorrar();
     actualizarTermometro(r.nivel, true);
     modoRespuesta(true);
-    decir(r.carlos_dice);
+    decir(r.carlos_dice, true);
     return;
   }
   S.resultados[p.id] = { tema: p.tema, tipo: tipoPunto(p), nivel: r.nivel, motivo: r.motivo, evidencia: r.evidencia, leyo, dubitativo, conversacion: S.hist.slice() };
   actualizarTermometro(r.nivel, false);
   pintarDoc($('d-doc'), {});
   progreso();
-  decir(r.carlos_dice);
+  detenerTemporizadorRespuesta(false);
+  decir(r.carlos_dice, false);
   $('d-controles').classList.add('oculto');
   $('b-sig').textContent = S.i < S.caso.puntos.length - 1 ? 'Siguiente' : 'Ver mi resultado';
   $('b-sig').classList.remove('oculto');
@@ -538,6 +729,7 @@ function reporte() {
   const sen = [];
   if (S.senales.leyo) sen.push(`${S.senales.leyo} respuesta(s) casi idénticas al texto del trabajo.`);
   if (S.senales.dubitativo) sen.push(`${S.senales.dubitativo} respuesta(s) con lenguaje dubitativo ("creo que", "tal vez").`);
+  if (S.senales.tiempoAgotado) sen.push(`${S.senales.tiempoAgotado} pregunta(s) superaron los 30 s para empezar a responder.`);
   if (S.senales.pantallaOculta) sen.push(`Salió de la pestaña ${S.senales.pantallaOculta} vez/veces.`);
   if (S.senales.pegadoBloqueado) sen.push(`Intentó pegar texto ${S.senales.pegadoBloqueado} vez/veces.`);
   if (S.senales.captura) sen.push(`Intentó capturar o imprimir la pantalla ${S.senales.captura} vez/veces.`);
@@ -548,25 +740,126 @@ function reporte() {
   $('r-senales').appendChild(ps2);
 
   const pend = ps.filter((p) => S.resultados[p.id].nivel !== 'verde');
+  const esTrabajoPropio = S.tarea && S.tarea.casoId === 'estudiante';
+  const esComun = !esTrabajoPropio;
   const sig = $('r-siguiente');
   sig.innerHTML = '';
   const h = document.createElement('h2'); const t = document.createElement('p'); const b = document.createElement('button');
   b.className = 'btn amarillo'; b.type = 'button'; b.style.marginTop = '12px';
-  h.textContent = S.tipo === 'practica' ? (pend.length ? 'Qué repasar' : 'Explicaste todos los puntos') : 'Reporte para el profesor';
-  t.id = 'r-estado-envio';
-  t.textContent = 'Enviando tu reporte y trabajo marcado al profesor…';
-  sig.append(h, t);
-  if (S.tipo === 'practica' && pend.length) {
-    const repaso = document.createElement('p');
-    repaso.textContent = 'Repasa: ' + pend.map((p) => p.tema.toLowerCase()).join(', ') + '.';
-    sig.appendChild(repaso);
-  }
-  if (S.tipo === 'practica') {
-    b.textContent = 'Rendir otra vez'; b.onclick = () => mostrar('inicio');
+  if (S.tipo === 'practica' || S.modo === 'practica') {
+    if (pend.length === 0) {
+      h.textContent = '¡Práctica superada: explicaste todos los puntos!';
+      t.textContent = esTrabajoPropio
+        ? 'Explicaste todos los puntos de tu trabajo con argumentos sólidos y convenciste a Carlos. Puedes rendir la práctica otra vez o consultar con tu profesor.'
+        : 'Explicaste todos los puntos del documento común con claridad y convenciste a Carlos. Puedes rendir la práctica otra vez.';
+      b.textContent = 'Rendir otra vez';
+      b.onclick = () => mostrar('inicio');
+      const bRe = document.createElement('button');
+      bRe.className = 'btn claro';
+      bRe.type = 'button';
+      bRe.textContent = 'Repetir ahora';
+      bRe.onclick = () => { empezar(); };
+      const fBotones = document.createElement('div');
+      fBotones.className = 'fila';
+      fBotones.style.marginTop = '14px';
+      fBotones.append(b, bRe);
+      sig.append(h, t, fBotones);
+    } else {
+      h.textContent = `Aspectos a repasar (${pend.length} de ${ps.length} pendientes)`;
+      t.textContent = esTrabajoPropio
+        ? 'Carlos encontró dudas en tus explicaciones sobre tu trabajo. Revisa estos puntos en tu informe antes de volver a rendir:'
+        : 'Carlos encontró dudas en tu comprensión del texto común. Revisa estos puntos en el documento antes de volver a rendir:';
+
+      const guia = document.createElement('div');
+      guia.className = 'guia-repaso';
+
+      pend.forEach((p) => {
+        const res = S.resultados[p.id];
+        const item = document.createElement('div');
+        item.className = 'guia-item ' + (res.nivel === 'rojo' ? 'rojo' : 'amarillo');
+
+        const tit = document.createElement('div');
+        tit.className = 'guia-item-tit';
+        const tagNivel = res.nivel === 'rojo' ? 'No superado' : 'A reforzar';
+        tit.innerHTML = `<span>${p.tema}</span><span class="chip ${res.nivel}">${tagNivel}</span>`;
+
+        const duda = document.createElement('div');
+        duda.className = 'guia-item-txt';
+        duda.innerHTML = `<b>Lo que preguntó Carlos:</b> ${corta(p.apertura, 130)}`;
+
+        const motivo = document.createElement('div');
+        motivo.className = 'guia-item-txt';
+        motivo.innerHTML = `<b>Por qué no convenció:</b> ${res.motivo || 'Faltó mayor profundidad o claridad técnica.'}`;
+
+        const tip = document.createElement('div');
+        tip.className = 'guia-item-tip';
+        let consejo = '';
+        if (p.tipo === 'trampa') {
+          consejo = 'Carlos intentó confundirte con una premisa errónea. No aceptes el error por cortesía: identifica la falla y corrígela con argumentos firmes.';
+        } else if (p.tipo === 'condicion') {
+          consejo = 'Carlos te cambió las condiciones o requisitos. Explica paso a paso cómo se adapta la propuesta sin romper lo que diseñaste antes.';
+        } else {
+          consejo = 'Fundamenta el porqué: explica las ventajas técnicas de esta decisión y por qué es superior a otras alternativas.';
+        }
+        if (esTrabajoPropio) {
+          consejo += ' Revisa en tu informe la sección resaltada y ten claras tus decisiones de diseño.';
+        } else {
+          consejo += ' Revisa el párrafo del documento del profesor para respaldar tu respuesta con las ideas del autor.';
+        }
+        if (res.leyo) {
+          consejo += ' Traduce la idea a tus propias palabras en vez de leer el texto.';
+        }
+        if (res.dubitativo) {
+          consejo += ' Responde con seguridad; evita muletillas como "creo que" o "tal vez".';
+        }
+        tip.textContent = '💡 Recomendación: ' + consejo;
+
+        item.append(tit, duda, motivo, tip);
+        guia.appendChild(item);
+      });
+
+      const alertas = [];
+      if (S.senales.leyo) alertas.push(`📖 Se detectó lectura casi literal en ${S.senales.leyo} punto(s). En la entrega, explica con tus propias palabras.`);
+      if (S.senales.dubitativo) alertas.push(`🤔 Usaste lenguaje dubitativo en ${S.senales.dubitativo} respuesta(s). Argumenta con mayor convicción.`);
+      if (S.senales.tiempoAgotado) alertas.push(`⏱️ En ${S.senales.tiempoAgotado} pregunta(s) se agotaron los 30 s para empezar a responder. Arranca con tu idea de inmediato.`);
+
+      let cAlertas = null;
+      if (alertas.length) {
+        cAlertas = document.createElement('div');
+        cAlertas.className = 'guia-alertas';
+        alertas.forEach((al) => {
+          const pa = document.createElement('div');
+          pa.textContent = al;
+          cAlertas.appendChild(pa);
+        });
+      }
+
+      b.textContent = 'Rendir otra vez';
+      b.onclick = () => mostrar('inicio');
+
+      const bRepetir = document.createElement('button');
+      bRepetir.className = 'btn claro';
+      bRepetir.type = 'button';
+      bRepetir.textContent = 'Repetir de inmediato';
+      bRepetir.onclick = () => { empezar(); };
+
+      const fBotones = document.createElement('div');
+      fBotones.className = 'fila';
+      fBotones.style.marginTop = '14px';
+      fBotones.append(b, bRepetir);
+
+      sig.append(h, t);
+      if (cAlertas) sig.append(cAlertas);
+      sig.append(guia, fBotones);
+    }
   } else {
-    b.textContent = 'Volver al inicio'; b.onclick = () => mostrar('rol');
+    h.textContent = 'Reporte para el profesor';
+    t.id = 'r-estado-envio';
+    t.textContent = 'Enviando tu reporte y trabajo marcado al profesor…';
+    b.textContent = 'Volver al inicio';
+    b.onclick = () => mostrar('rol');
+    sig.append(h, t, b);
   }
-  sig.appendChild(b);
   if (S.modo === 'evaluacion' && window.registrarSesionEvaluacion) window.registrarSesionEvaluacion(seg);
   mostrar('reporte');
 }
@@ -594,7 +887,7 @@ function enviarRespuesta() {
 }
 $('b-enviar').onclick = enviarRespuesta;
 $('b-borrar').onclick = borrarDictado;
-$('resp').addEventListener('input', actualizarBorrar);
+$('resp').addEventListener('input', () => { actualizarBorrar(); if ($('resp').value.trim()) marcarInicioRespuesta(); });
 $('b-cambiar').onclick = () => {
   detenerMic();
   S.respuesta = S.respuesta === 'voz' ? 'texto' : 'voz';
@@ -606,6 +899,7 @@ $('b-cambiar').onclick = () => {
 const enDefensaOReporte = () => $('defensa').classList.contains('on') || $('reporte').classList.contains('on');
 const entregaEnCurso = () => S.modo === 'evaluacion' && S.intento && S.respondio && !S.entregaConfirmada && enDefensaOReporte();
 $('b-salir').onclick = async () => {
+  detenerTemporizadorRespuesta(false);
   const aviso = !S.respondio ? '¿Salir? Aún no respondiste nada, así que podrás empezar de nuevo.'
     : S.tipo === 'practica' ? '¿Salir de la práctica? Lo que llevas respondido le llega a tu profesor como un intento, y podrás rendirla otra vez.'
       : '¿Salir de la evaluación? Solo tienes un intento: tu profesor recibirá lo que llevas respondido y no podrás volver a empezar.';
@@ -631,7 +925,7 @@ if (!SR) {
   $('op-voz').classList.add('deshabilitada');
   $('op-voz-txt').textContent = 'Este navegador no permite dictado. Para hablar, abre la página en Chrome o Edge.';
 }
-$('b-nose').onclick = () => responder('No sé.', 'boton');
+$('b-nose').onclick = () => { detenerTemporizadorRespuesta(false); responder('No sé.', 'boton'); };
 $('b-sim').onclick = () => { $('resp').value = punto()?.simulado?.respuesta || `Explicación con mis propias palabras sobre ${punto()?.tema || 'este punto'} justificando la decisión del diseño.`; actualizarBorrar(); };
 $('b-sig').onclick = siguiente;
 $('resp').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarRespuesta(); });

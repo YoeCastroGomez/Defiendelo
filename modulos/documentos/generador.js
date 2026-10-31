@@ -203,7 +203,7 @@ function frecuenciaDocumento(fragmentos) {
   return df;
 }
 
-const escapar = (w) => w.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+const escapar = (w) => w.replace(/[\\^$*+?.()|[\]{}]/g, '\\$&');
 
 // Palabra más característica del fragmento (frecuente aquí, rara en el resto), con su escritura original.
 function terminoClave(frag, excluir = new Set(), df = null, total = 1) {
@@ -482,7 +482,7 @@ export async function generarPuntos(datos, fragmentos) {
     }
     try {
       const mensajes = [{ role: 'user', content: `${datos.comun ? 'Documento' : 'Trabajo del estudiante'}, dividido en fragmentos:\n<<<TRABAJO\n${doc}\nTRABAJO>>>` }];
-      const salida = await llamarLLM(instruccion, mensajes, { maxTokens: 8192, timeoutMs: restante() });
+      const salida = await llamarLLM(instruccion, mensajes, { maxTokens: 2500, timeoutMs: restante() });
       const d = extraerJSON(salida);
       const crudos = Array.isArray(d) ? d : (d?.puntos || d?.items || d?.defensa || d?.preguntas || d);
       return { puntos: normalizarPuntos(crudos, fragmentos), titulo: recortar(d?.titulo, 120), modoGeneracion: 'ia' };

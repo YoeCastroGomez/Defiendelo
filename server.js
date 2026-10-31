@@ -10,7 +10,7 @@ const RAIZ = path.dirname(fileURLToPath(import.meta.url));
 if (existsSync(path.join(RAIZ, '.env'))) {
   for (const l of readFileSync(path.join(RAIZ, '.env'), 'utf8').split('\n')) {
     const m = l.match(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
-    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '').trim();
   }
 }
 
@@ -33,7 +33,7 @@ const MAX_BODY_BYTES = 4.5 * 1024 * 1024;
 http.createServer((req, res) => atender(req, res).catch((e) => {
   console.error('[server]', e);
   if (!res.headersSent) { res.statusCode = 500; res.end('Error interno'); } else res.end();
-})).listen(PUERTO, () => console.log(`Defiéndelo en http://localhost:${PUERTO}`));
+})).listen(PUERTO, () => console.log(`Defiendelo en http://localhost:${PUERTO}`));
 
 async function atender(req, res) {
   const url = new URL(req.url, 'http://x');
