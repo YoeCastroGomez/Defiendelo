@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { guardar, persistente } from '../compartido/almacen.js';
 import { generarCaso, MIN_PALABRAS, MAX_PALABRAS } from '../modulos/documentos/generador.js';
 import { proveedorConfigurado } from '../compartido/llm.js';
+import { obtenerTareaInterna } from '../modulos/tareas/tareas.js';
 
 const nuevoCasoId = () => 'doc-' + randomBytes(5).toString('hex');
 const limpio = (v, max) => String(v || '').trim().slice(0, max);
@@ -28,6 +29,13 @@ export default async function handler(req, res) {
       estudiante: limpio(b.estudiante, 80),
       universidadId: 'demo',
     };
+
+    // Con código, los datos del profesor salen de la tarea guardada: el cliente no puede cambiarlos.
+    if (b.codigo) {
+      const t = await obtenerTareaInterna(b.codigo);
+      if (!t) return res.status(404).json({ error: 'No existe una tarea con ese código' });
+      Object.assign(datos, { curso: t.curso, tarea: t.titulo, criterios: t.criterios, enunciado: t.enunciado });
+    }
 
     const { caso } = await generarCaso({ ...datos, id: nuevoCasoId() });
     // `guardar` no sobrescribe: si el id ya estaba tomado, se reetiqueta el caso y se reintenta.

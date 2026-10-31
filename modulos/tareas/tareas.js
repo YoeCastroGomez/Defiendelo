@@ -67,6 +67,8 @@ export async function crearTarea(datos = {}) {
     curso,
     profesor: limpio(datos.profesor, 80),
     criterios: limpio(datos.criterios, 600),
+    enunciado: limpio(datos.enunciado, 40000),
+    enunciadoNombre: limpio(datos.enunciadoNombre, 120),
     cierre: limpio(datos.cierre, 40),
     casoId,
     tokenProfesor,

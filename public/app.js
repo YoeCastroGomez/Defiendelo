@@ -77,6 +77,14 @@ function actualizarTermometro(ultimoNivel, enRepregunta) {
 /* ---------- voz ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, grabando = false, base = '';
+const ESCUCHANDO = 'Te escucho. Pulsa Detener cuando termines.';
+const ERRORES_MIC = {
+  'not-allowed': 'El navegador bloqueó el micrófono. Permítelo con el icono junto a la dirección de la página, o escribe tu respuesta.',
+  'service-not-allowed': 'El navegador bloqueó el dictado. Usa Chrome o Edge, o escribe tu respuesta.',
+  'audio-capture': 'No se detectó ningún micrófono. Conecta uno o escribe tu respuesta.',
+  network: 'El dictado de este navegador no está disponible. Usa Chrome o Edge, o escribe tu respuesta.',
+  'no-speech': 'No se escuchó nada. Revisa tu micrófono y pulsa Hablar otra vez.',
+};
 function hablar(texto) {
   $('av-carlos')?.classList.remove('hablando');
   if (!$('c-voz').checked || !('speechSynthesis' in window)) return;
@@ -105,10 +113,24 @@ function toggleMic() {
     }
     $('resp').value = base + fin + tmp;
   };
-  rec.onend = () => { grabando = false; $('b-mic').textContent = '● Hablar'; $('b-mic').classList.remove('grabando'); };
-  rec.onerror = (e) => { $('d-aviso').textContent = 'Micrófono: ' + e.error + '. Puedes escribir tu respuesta.'; };
+  rec.onend = () => { grabando = false; $('b-mic').textContent = '● Hablar'; $('b-mic').classList.remove('grabando'); if ($('d-aviso').textContent === ESCUCHANDO) $('d-aviso').textContent = ''; };
+  rec.onerror = (e) => { $('d-aviso').textContent = ERRORES_MIC[e.error] || 'No se pudo usar el micrófono. Puedes escribir tu respuesta.'; };
   rec.start();
   grabando = true; $('b-mic').textContent = '■ Detener'; $('b-mic').classList.add('grabando');
+  $('d-aviso').textContent = ESCUCHANDO;
+}
+// Al enviar se deja de transcribir: una frase que llegue tarde no debe caer en la respuesta del siguiente punto.
+function detenerMic() {
+  if (!grabando) return;
+  rec.onresult = null;
+  rec.stop();
+}
+function aplicarModoRespuesta() {
+  const voz = S.respuesta === 'voz';
+  $('b-mic').classList.toggle('oculto', !voz);
+  $('b-cambiar').classList.toggle('oculto', !SR);
+  $('b-cambiar').textContent = voz ? 'Prefiero escribir' : 'Prefiero hablar';
+  $('resp').placeholder = voz ? 'Pulsa Hablar y explícale a Carlos. Aquí verás lo que dices y podrás corregirlo.' : 'Escribe tu explicación con tus palabras…';
 }
 
 /* ---------- documento ---------- */
@@ -154,7 +176,7 @@ async function iniciar() {
     const r = await (await fetch('api/carlos')).json();
     S.iaOK = !!r.ia;
   } catch { S.iaOK = false; }
-  document.querySelectorAll('.estado-ia').forEach((e) => { e.textContent = S.iaOK ? 'IA conectada' : 'modo simulado (sin IA configurada)'; });
+  document.querySelectorAll('.estado-ia').forEach((e) => { e.textContent = S.iaOK ? '' : 'modo demostración, sin IA'; });
   const pre = new URLSearchParams(location.search).get('codigo');
   if (pre) { $('codigo').value = normCodigo(pre); return entrarConCodigo(); }
   mostrar('rol');
@@ -186,8 +208,11 @@ async function entrarConCodigo(e) {
   $('i-titulo').textContent = t.titulo;
   $('i-crit').textContent = t.criterios || '';
   $('i-crit-caja').classList.toggle('oculto', !t.criterios);
+  $('i-enunciado-caja').classList.toggle('oculto', !t.enunciado);
+  $('i-enunciado-nombre').textContent = 'Leer el documento de la tarea' + (t.enunciadoNombre ? ': ' + t.enunciadoNombre : '');
+  $('i-enunciado').textContent = t.enunciado || '';
   $('i-codigo').textContent = t.codigo;
-  $('i-tarea').textContent = S.caso ? S.caso.documento.titulo : 'Pendiente: sube tu archivo (.pdf o .docx)';
+  $('i-tarea').textContent = S.caso ? S.caso.documento.titulo : 'Aún no subes tu resolución';
   $('i-prov').textContent = S.caso?.provisional ? 'caso de ejemplo provisional' : '';
   window.dispatchEvent(new CustomEvent('defiendelo:inicio', { detail: t }));
   mostrar('inicio');
@@ -210,12 +235,12 @@ async function crearTarea(e) {
   try {
     const r = await fetch('api/tareas', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ titulo: $('t-titulo').value, curso: $('t-curso').value, profesor: $('t-prof').value, criterios: $('t-crit').value, cierre: $('t-cierre').value, casoId: $('t-caso').value }),
+      body: JSON.stringify({ titulo: $('t-titulo').value, curso: $('t-curso').value, profesor: $('t-prof').value, criterios: $('t-crit').value, cierre: $('t-cierre').value, casoId: $('t-caso').value, ...(window.enunciadoTarea ? window.enunciadoTarea() : {}) }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'No se pudo crear la tarea');
     $('c-codigo').textContent = d.codigo;
-    $('c-aviso').textContent = d.persistente ? 'El código queda activo 60 días.' : 'Demo sin base de datos: el código dura mientras el servidor siga encendido.';
+    $('c-aviso').textContent = d.persistente ? 'El código queda activo 60 días.' : 'Sin base de datos conectada: el código dura mientras el servidor siga encendido.';
     if (window.mostrarTokenCreado) window.mostrarTokenCreado(d);
     $('creada').classList.remove('oculto');
     $('creada').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -236,14 +261,14 @@ function empezar() {
   if (!S.nombre) { $('nombre-err').textContent = 'Escribe tu nombre para que tu profesor reconozca tu defensa.'; $('nombre').focus(); return; }
   $('nombre-err').textContent = '';
   S.modo = document.querySelector('input[name=modo]:checked').value;
+  S.respuesta = document.querySelector('input[name=respuesta]:checked').value;
   S.i = 0; S.resultados = {}; S.t0 = Date.now();
   S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false };
   $('marca-agua').textContent = `${S.nombre} · ${S.tarea.codigo}   `.repeat(120);
   $('d-modo').textContent = S.modo === 'practica' ? 'práctica' : 'evaluación';
   $('d-titulo').textContent = S.caso.documento.titulo;
-  $('b-sim').classList.toggle('oculto', S.iaOK && !S.forzarSim && S.modo === 'evaluacion');
-  $('b-mic').classList.toggle('oculto', !SR);
-  if (!SR) $('d-aviso').textContent = 'Tu navegador no permite dictado: escribe tu respuesta (Chrome sí lo permite).';
+  $('b-sim').classList.toggle('oculto', S.iaOK && !S.forzarSim);
+  aplicarModoRespuesta();
   actualizarTermometro(null, false);
   mostrar('defensa');
   abrirPunto();
@@ -267,7 +292,7 @@ function abrirPunto() {
   S.hist = [{ rol: 'carlos', texto: p.apertura }];
   S.repregunto = false;
   $('d-punto').textContent = `punto ${S.i + 1} de ${S.caso.puntos.length}`;
-  $('resp').value = ''; $('d-aviso').textContent = SR ? '' : $('d-aviso').textContent;
+  $('resp').value = ''; $('d-aviso').textContent = '';
   if ($('cinta-condicion')) $('cinta-condicion').classList.toggle('oculto', tp !== 'condicion');
   fijarAvatar(tp === 'trampa' ? 'confundido' : 'curioso');
   modoRespuesta(true);
@@ -279,7 +304,8 @@ function abrirPunto() {
   if (f && caja.scrollHeight > caja.clientHeight) caja.scrollTo({ top: f.offsetTop - caja.clientHeight / 3, behavior: 'smooth' });
 }
 function modoRespuesta(on) {
-  ['b-mic', 'b-enviar', 'b-nose', 'b-sim', 'resp'].forEach((id) => { $(id).disabled = !on; });
+  ['b-mic', 'b-enviar', 'b-nose', 'b-sim', 'b-cambiar', 'resp'].forEach((id) => { $(id).disabled = !on; });
+  if (on) $('d-controles').classList.remove('oculto');
   $('b-sig').classList.toggle('oculto', on);
 }
 
@@ -314,7 +340,7 @@ function simuladoBase(p, texto, leyo, dubitativo) {
 
 async function responder(texto) {
   texto = (texto || '').trim();
-  if (grabando) rec.stop();
+  detenerMic();
   const p = punto();
   const leyo = contencion(texto, frag(p.fragmento).texto) >= 0.6;
   const dubitativo = esDubitativo(texto);
@@ -360,6 +386,7 @@ async function responder(texto) {
   pintarDoc($('d-doc'), {});
   progreso();
   decir(r.carlos_dice);
+  $('d-controles').classList.add('oculto');
   $('b-sig').textContent = S.i < S.caso.puntos.length - 1 ? 'Siguiente' : 'Ver mi resultado';
   $('b-sig').classList.remove('oculto');
   $('b-sig').focus();
@@ -417,12 +444,12 @@ function reporte() {
   if (S.modo === 'practica') {
     h.textContent = pend.length ? 'Qué repasar' : 'Listo para la evaluación';
     t.textContent = pend.length ? 'Repasa: ' + pend.map((p) => p.tema.toLowerCase()).join(', ') + '. Luego vuelve a intentarlo con Carlos.' : 'Explicaste todos los puntos. Ya puedes hacer la defensa en modo evaluación.';
-    b.textContent = 'Intentar de nuevo'; b.onclick = () => mostrar('inicio');
+    b.textContent = 'Volver a la tarea'; b.onclick = () => mostrar('inicio');
   } else {
     h.textContent = 'Reporte para el profesor';
     t.id = 'r-estado-envio';
     t.textContent = 'Enviando tu reporte y trabajo marcado al profesor…';
-    b.textContent = 'Volver al inicio'; b.onclick = () => mostrar('inicio');
+    b.textContent = 'Volver al inicio'; b.onclick = () => mostrar('rol');
   }
   sig.append(h, t, b);
   if (S.modo === 'evaluacion' && window.registrarSesionEvaluacion) window.registrarSesionEvaluacion(seg);
@@ -445,11 +472,35 @@ $('b-probar').onclick = () => { $('codigo').value = $('c-codigo').textContent; e
 document.querySelectorAll('[data-ir]').forEach((b) => { b.onclick = () => mostrar(b.dataset.ir); });
 $('b-empezar').onclick = empezar;
 $('b-mic').onclick = toggleMic;
-$('b-enviar').onclick = () => responder($('resp').value);
+// Enviar vacío contaría como rojo: el estudiante debe decir algo o pulsar "No sé".
+function enviarRespuesta() {
+  if (!$('resp').value.trim()) { $('d-aviso').textContent = 'Primero explícale algo a Carlos, o pulsa "No sé".'; return; }
+  responder($('resp').value);
+}
+$('b-enviar').onclick = enviarRespuesta;
+$('b-cambiar').onclick = () => {
+  detenerMic();
+  S.respuesta = S.respuesta === 'voz' ? 'texto' : 'voz';
+  aplicarModoRespuesta();
+  if (S.respuesta === 'texto') $('resp').focus();
+};
+$('b-salir').onclick = () => {
+  const aviso = S.modo === 'evaluacion' ? '¿Salir de la defensa? Tu avance se pierde y el profesor no recibirá ningún reporte.' : '¿Salir de la práctica? Tu avance se pierde.';
+  if (!window.confirm(aviso)) return;
+  detenerMic();
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  mostrar('inicio');
+};
+if (!SR) {
+  document.querySelector('input[name=respuesta][value=voz]').disabled = true;
+  document.querySelector('input[name=respuesta][value=texto]').checked = true;
+  $('op-voz').classList.add('deshabilitada');
+  $('op-voz-txt').textContent = 'Este navegador no permite dictado. Para hablar, abre la página en Chrome o Edge.';
+}
 $('b-nose').onclick = () => responder('No sé.');
 $('b-sim').onclick = () => { $('resp').value = punto()?.simulado?.respuesta || `Explicación con mis propias palabras sobre ${punto()?.tema || 'este punto'} justificando la decisión del diseño.`; };
 $('b-sig').onclick = siguiente;
-$('resp').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) responder($('resp').value); });
+$('resp').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarRespuesta(); });
 $('resp').addEventListener('paste', (e) => {
   if (S.modo === 'evaluacion') { e.preventDefault(); S.senales.pegadoBloqueado++; $('d-aviso').textContent = 'En evaluación no se puede pegar texto.'; }
 });

@@ -308,6 +308,28 @@ describe('/api/documentos', () => {
     assert.match(ia.prompts[0], /CRITERIO-DE-PRUEBA/);
   });
 
+  test('el enunciado del profesor llega al estudiante y a la IA', async () => {
+    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'estudiante', enunciado: 'ENUNCIADO-DE-PRUEBA', enunciadoNombre: 'Guía 1' } });
+    const { codigo } = creada.json;
+    const publica = await llamar(apiTareas, { query: { codigo } });
+    assert.equal(publica.json.enunciado, 'ENUNCIADO-DE-PRUEBA');
+    assert.equal(publica.json.enunciadoNombre, 'Guía 1');
+
+    const ia = simularIA([{ status: 500, error: 'x' }, { status: 500, error: 'x' }]);
+    const original = console.error;
+    console.error = () => {};
+    await llamar(apiDocumentos, { method: 'POST', body: { codigo, titulo: 'Resolución', enunciado: 'FALSO', texto: palabras(300) } });
+    console.error = original;
+    ia.restaurar();
+    assert.match(ia.prompts[0], /ENUNCIADO-DE-PRUEBA/);
+    assert.equal(ia.prompts[0].includes('FALSO'), false);
+  });
+
+  test('un código de tarea inexistente responde 404', async () => {
+    const r = await llamar(apiDocumentos, { method: 'POST', body: { codigo: 'ZZZ-ZZZ', titulo: 'Resolución', texto: palabras(300) } });
+    assert.equal(r.status, 404);
+  });
+
   test('una tarea puede usar como base el caso recién creado', async () => {
     const doc = await llamar(apiDocumentos, documento(palabras(300)));
     const r = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: doc.json.casoId } });
