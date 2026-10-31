@@ -4,8 +4,8 @@
 
 Proyecto para **DSC HACK 2026** · Reto *Educación 2036* · Grieta 02 *“Aprender sin pensar”*.
 
-**Demo:** `<!-- TODO: enlace de Vercel -->`
-**Pitch:** `<!-- TODO: enlace a las diapositivas -->`
+**Demo:** https://defiendelo-six.vercel.app
+**Pitch:** *[Pendiente: pegar aquí el enlace a las diapositivas]*
 
 ---
 
@@ -19,7 +19,14 @@ Con la IA generativa, un estudiante puede entregar un trabajo impecable sin ente
 - **Una defensa oral manual** sí funciona, pero no escala: a unos 15 minutos por alumno, una clase de 40 son 10 horas por tarea.
 
 ### Aprendizajes con usuarios reales
-<!-- TODO: completar con las entrevistas reales (3 a 5 estudiantes y 1 a 2 profesores): citas textuales, tiempos medidos y qué cambió en el producto. Es el 30 % de la evaluación. No inventar datos. -->
+*[Pendiente: completar con las entrevistas reales. No se publican datos hasta tenerlos.]*
+
+Probamos Defiéndelo con **[N] estudiantes** y **[N] profesores** de **[carrera y universidad]**.
+
+| Quién | Qué probó | Cita textual | Dato medido | Qué cambiamos por esto |
+|---|---|---|---|---|
+| Estudiante 1 | | | | |
+| Profesor 1 | | | | |
 
 ### La solución
 Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 minutos. El estudiante no responde a un examinador: **le enseña su trabajo a Carlos**, un compañero de IA que no lo entiende y que a veces se equivoca con mucha seguridad.
@@ -49,6 +56,24 @@ El profesor siempre decide la nota. Defiéndelo solo **sugiere un nivel** y entr
 
 ### Diferencia con lo que ya existe
 Existen herramientas de evaluación oral con IA (Viva de NYU Stern, Viva de InitialView, FeedbackFruits Oral Assessment, Socratic Mind, Breakout Learning). Todas siguen la lógica de *“la IA examina y el profesor recibe una evaluación”*. Defiéndelo cambia el formato: **el estudiante enseña a un compañero que se equivoca**, y el resultado es **su propio trabajo marcado**, no una nota.
+
+### Qué lo distingue de un chatbot
+Un chatbot intercambia mensajes. Defiéndelo es un entorno de simulación con cinco mecánicas que trabajan sobre el propio trabajo del estudiante:
+
+1. **Carlos con cara y voz.** Un avatar vectorial cambia entre 5 estados (`curioso`, `confundido`, `ironico`, `convencido` y `pensando`) y se anima mientras habla con la voz del navegador.
+2. **Termómetro de convencimiento.** Una barra de 0 a 100 % sube con cada punto que el estudiante logra explicar (verde suma 1, amarillo 0,45 y rojo 0) y se sacude cuando no logra convencer a Carlos.
+3. **Cambio de condición.** Cada punto es una `decisión`, una `trampa` (Carlos sostiene un error a propósito) o una `condición`. En el punto de condición aparece una cinta que avisa de un cambio imprevisto: “¿y si mañana piden avisar por WhatsApp?”.
+4. **Detección de inseguridad y de lectura literal.** El navegador detecta muletillas (“creo que”, “tal vez”, “no estoy seguro”, “supongo”) y respuestas que copian el trabajo. Ambas quedan guardadas por punto y como señales para el profesor. En modo simulado, Carlos reacciona a ellas con ironía amistosa.
+5. **Anotación sobre el fragmento.** Carlos no habla en abstracto: el documento se desplaza al párrafo en discusión y lo etiqueta con `Duda de Carlos`, `Hipótesis de Carlos` o `Cambio de condición`, más el tema.
+
+### Panel del profesor
+Está pensado para entenderse en segundos, sin muros de texto:
+
+- **Resumen:** entregas recibidas con la duración media, cuántos estudiantes quedaron en nivel alto, medio y bajo (en una barra segmentada), cuántas entregas piden revisión y el tema más débil de la clase.
+- **Lista:** una fila por estudiante con su nombre, cuatro celdas de color (una por punto), el nivel sugerido y, solo si las hay, el número de alertas.
+- **Detalle:** a la izquierda, el trabajo del estudiante marcado en verde, amarillo o rojo; a la derecha, un resumen de una oración y una cita por punto. El diálogo completo con Carlos queda cerrado hasta que el docente lo abre.
+
+Las señales (salidas de la pestaña, intentos de pegar, lectura literal y muletillas) son informativas. La nota final la decide siempre el profesor.
 
 ---
 
@@ -90,7 +115,7 @@ Capa 3 · Infraestructura (compartido/)
 ### Cómo funciona un turno
 1. Cada **punto** del caso está atado a un fragmento del trabajo. Carlos abre el punto con una pregunta (y, si corresponde, con un error a propósito) y ese fragmento se resalta.
 2. El estudiante responde hablando o escribiendo.
-3. Antes de enviar, el navegador mide qué parte de la respuesta es **copia literal del trabajo** (trigramas de palabras). Si supera el 60 %, se marca como “leyó su trabajo”.
+3. Antes de enviar, el navegador mide qué parte de la respuesta es **copia literal del trabajo** (trigramas de palabras). Si supera el 60 %, se marca como “leyó su trabajo”. También detecta muletillas de duda; ambas marcas viajan con el turno como `leyo` y `dubitativo`.
 4. El backend envía al modelo el trabajo, el punto, lo que una buena explicación debería cubrir (oculto para el estudiante) y la conversación. El modelo responde **un solo JSON**:
    ```json
    { "nivel": "verde|amarillo|rojo", "motivo": "...", "evidencia": "...", "repreguntar": false, "carlos_dice": "..." }
@@ -126,7 +151,7 @@ vercel.json           Incluye los casos en las funciones y fija maxDuration
 
 ## 🔗 Demo desplegada
 
-`<!-- TODO: enlace de Vercel -->`
+https://defiendelo-six.vercel.app
 
 **Uso:**
 1. Como profesor: *Crear tarea* → *Generar código*, y guarda el token. Como estudiante: ingresa ese código (o `DEMO-01`) y tu nombre.
@@ -154,6 +179,9 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 - Panel del profesor con entregas, señales, conversación por punto y trabajo marcado.
 - Señales de sesión: respuestas leídas del trabajo, salidas de la pestaña, intentos de pegar y de captura.
 - Respaldo automático a modo simulado si la IA falla en medio de la sesión.
+- Mecánicas interactivas: avatar expresivo, termómetro de convencimiento, cinta de cambio de condición, detección de muletillas y anotación del fragmento en discusión.
+- Panel del profesor con resumen de la clase, lista escaneable por estudiante y detalle con el diálogo colapsado.
+- Pruebas automáticas de los contratos de la API, de la seguridad y del despliegue.
 
 **Limitaciones actuales**
 - **Los PDF escaneados no se leen** porque no hay OCR: hace falta texto seleccionable o un `.docx`.
@@ -180,6 +208,9 @@ cp .env.example .env     # opcional: sin .env funciona en modo simulado
 node server.js           # http://localhost:3000
 node --test              # pruebas, sin red ni .env
 ```
+
+### Pruebas
+`node --test` corre `tests/contratos.test.js` sin red, sin `.env` y sin instalar nada: usa el almacén en memoria y un proveedor de IA simulado. Cubre el almacén, los endpoints (`tareas`, `casos`, `carlos`, `sesiones`, `documentos` y `archivos`), la protección de lo que el estudiante no debe ver (`que_debe_explicar`, `error_de_carlos`, tokens y rutas de archivos), los tipos de punto, el límite de 30 peticiones por minuto y la configuración de despliegue.
 
 ### Configurar la IA
 En `.env` (local) o en las variables de entorno de Vercel:
