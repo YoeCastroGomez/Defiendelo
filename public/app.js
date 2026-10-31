@@ -192,6 +192,7 @@ async function entrarConCodigo(e) {
     const t = await r.json();
     if (!r.ok) throw new Error(t.error || 'No se pudo cargar la tarea');
     S.tarea = t;
+    S.casoUsado = false;
     S.casoId = t.casoId || 'demo';
     if (S.casoId === 'estudiante') {
       S.caso = null;
@@ -257,17 +258,46 @@ async function copiar(texto, boton) {
   setTimeout(() => { boton.textContent = antes; }, 1600);
 }
 
-function empezar() {
+// Avisa antes de empezar: el servidor rechaza igual la segunda entrega, pero sin hacer perder la defensa.
+async function yaEntrego() {
+  try {
+    const r = await fetch('api/sesiones?codigo=' + encodeURIComponent(S.tarea.codigo) + '&nombre=' + encodeURIComponent(S.nombre));
+    return r.ok && (await r.json()).entregada;
+  } catch {
+    return false;
+  }
+}
+
+async function empezar() {
   if (!S.caso) { $('nombre-err').textContent = 'Primero sube y procesa tu trabajo (.pdf o .docx).'; return; }
   S.nombre = $('nombre').value.trim();
   if (!S.nombre) { $('nombre-err').textContent = 'Escribe tu nombre para que tu profesor reconozca tu defensa.'; $('nombre').focus(); return; }
   $('nombre-err').textContent = '';
   S.modo = document.querySelector('input[name=modo]:checked').value;
+  if (S.modo === 'evaluacion') {
+    const boton = $('b-empezar');
+    const textoBoton = boton.textContent;
+    boton.disabled = true;
+    try {
+      if (await yaEntrego()) { $('nombre-err').textContent = 'Ya entregaste esta tarea con ese nombre. Solo se permite un intento; puedes seguir ensayando.'; return; }
+      if (S.casoUsado && window.renovarCasoEntrega) {
+        boton.textContent = 'Carlos prepara dudas nuevas…';
+        await window.renovarCasoEntrega();
+      }
+    } catch (err) {
+      $('nombre-err').textContent = err.message;
+      return;
+    } finally {
+      boton.disabled = false;
+      boton.textContent = textoBoton;
+    }
+  }
+  S.casoUsado = true;
   S.respuesta = document.querySelector('input[name=respuesta]:checked').value;
   S.i = 0; S.resultados = {}; S.t0 = Date.now();
   S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false };
   $('marca-agua').textContent = `${S.nombre} · ${S.tarea.codigo}   `.repeat(120);
-  $('d-modo').textContent = S.modo === 'practica' ? 'práctica' : 'evaluación';
+  $('d-modo').textContent = S.modo === 'practica' ? 'ensayo' : 'entrega';
   $('d-titulo').textContent = S.caso.documento.titulo;
   $('b-sim').classList.toggle('oculto', S.iaOK && !S.forzarSim);
   aplicarModoRespuesta();
@@ -406,7 +436,7 @@ function reporte() {
   const nivel = prom >= 1.5 ? ['verde', 'Nivel alto sugerido'] : prom >= 0.8 ? ['amarillo', 'Nivel medio sugerido'] : ['rojo', 'Nivel bajo sugerido'];
   const seg = Math.round((Date.now() - S.t0) / 1000);
   $('r-meta').textContent = `${S.nombre} · ${S.tarea.codigo} · ${Math.floor(seg / 60)} min ${seg % 60} s`;
-  $('r-modo').textContent = S.modo === 'practica' ? 'práctica · solo tú ves este resultado' : 'evaluación · reporte para el profesor';
+  $('r-modo').textContent = S.modo === 'practica' ? 'ensayo · tu tarea aún no está entregada' : 'entrega · reporte para el profesor';
   const verdes = ps.filter((p) => S.resultados[p.id].nivel === 'verde').length;
   $('r-titulo').textContent = `Le explicaste bien ${verdes} de ${ps.length} puntos a Carlos.`;
   $('r-nota').textContent = S.modo === 'evaluacion' ? 'La nota final la decide tu profesor. Este nivel es solo una sugerencia.' : 'Haz clic en una parte marcada del trabajo para ver qué dijiste.';
@@ -444,8 +474,8 @@ function reporte() {
   const h = document.createElement('h2'); const t = document.createElement('p'); const b = document.createElement('button');
   b.className = 'btn amarillo'; b.type = 'button'; b.style.marginTop = '12px';
   if (S.modo === 'practica') {
-    h.textContent = pend.length ? 'Qué repasar' : 'Listo para la evaluación';
-    t.textContent = pend.length ? 'Repasa: ' + pend.map((p) => p.tema.toLowerCase()).join(', ') + '. Luego vuelve a intentarlo con Carlos.' : 'Explicaste todos los puntos. Ya puedes hacer la defensa en modo evaluación.';
+    h.textContent = pend.length ? 'Esto fue un ensayo: qué repasar' : 'Esto fue un ensayo: ya puedes entregar';
+    t.textContent = pend.length ? 'Repasa: ' + pend.map((p) => p.tema.toLowerCase()).join(', ') + '. Tu tarea aún no está entregada: cuando estés listo, vuelve y elige Entregar.' : 'Explicaste todos los puntos, pero tu tarea aún no está entregada. Vuelve y elige Entregar.';
     b.textContent = 'Volver a la tarea'; b.onclick = () => mostrar('inicio');
   } else {
     h.textContent = 'Reporte para el profesor';
@@ -487,7 +517,7 @@ $('b-cambiar').onclick = () => {
   if (S.respuesta === 'texto') $('resp').focus();
 };
 $('b-salir').onclick = () => {
-  const aviso = S.modo === 'evaluacion' ? '¿Salir de la defensa? Tu avance se pierde y el profesor no recibirá ningún reporte.' : '¿Salir de la práctica? Tu avance se pierde.';
+  const aviso = S.modo === 'evaluacion' ? '¿Salir de la entrega? Tu avance se pierde y el profesor no recibirá ningún reporte.' : '¿Salir del ensayo? Tu avance se pierde.';
   if (!window.confirm(aviso)) return;
   detenerMic();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -504,7 +534,7 @@ $('b-sim').onclick = () => { $('resp').value = punto()?.simulado?.respuesta || `
 $('b-sig').onclick = siguiente;
 $('resp').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarRespuesta(); });
 $('resp').addEventListener('paste', (e) => {
-  if (S.modo === 'evaluacion') { e.preventDefault(); S.senales.pegadoBloqueado++; $('d-aviso').textContent = 'En evaluación no se puede pegar texto.'; }
+  if (S.modo === 'evaluacion') { e.preventDefault(); S.senales.pegadoBloqueado++; $('d-aviso').textContent = 'En la entrega no se puede pegar texto.'; }
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && $('defensa').classList.contains('on')) S.senales.pantallaOculta++;

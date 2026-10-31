@@ -66,7 +66,7 @@
       <div class="pila-c"><label class="etq" for="t-caso">Qué defenderán tus estudiantes</label><select id="t-caso"></select>
         <span class="chico suave" id="t-origen-ayuda"></span>
         <div id="caja-base-prof" class="oculto"></div></div>
-      <div class="pila-c"><label class="etq" for="t-cierre">Cierre (opcional)</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
+      <div class="pila-c oculto"><label class="etq" for="t-cierre">Cierre (opcional)</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
       <p class="error" id="tarea-err" role="alert"></p>
       <button class="btn" type="submit" id="b-crear">Generar código</button>
     </form>
@@ -112,11 +112,11 @@
       <div class="pila-c"><label class="etq" for="nombre" style="margin:0">Tu nombre</label><input id="nombre" type="text" autocomplete="name" maxlength="80"><p class="error" id="nombre-err" role="alert"></p></div>
 
       <fieldset>
-        <legend class="etq">Modo</legend>
+        <legend class="etq">Qué quieres hacer</legend>
         <label class="opcion"><input type="radio" name="modo" value="practica" checked>
-          <span><b>Práctica</b><br><span class="suave">Solo tú ves el resultado. Puedes repetir las veces que quieras.</span></span></label>
+          <span><b>Ensayar</b><br><span class="suave">No se envía a tu profesor y tu tarea sigue sin entregar. Puedes repetirlo las veces que quieras.</span></span></label>
         <label class="opcion"><input type="radio" name="modo" value="evaluacion">
-          <span><b>Evaluación</b><br><span class="suave">El reporte lo ve tu profesor. Pegar texto está desactivado.</span></span></label>
+          <span><b>Entregar</b><br><span class="suave">Tu profesor recibe el reporte. Tienes un solo intento y Carlos trae dudas nuevas.</span></span></label>
       </fieldset>
 
       <fieldset>

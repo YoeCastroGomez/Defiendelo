@@ -278,6 +278,7 @@
     chip.textContent = entrega ? 'pendiente' : 'listo';
     chip.classList.toggle('ok', !entrega);
     $('b-empezar').disabled = entrega;
+    window.renovarCasoEntrega = null;
     botonesDescarga($('i-enunciado-archivos'), ev.detail, ev.detail.enunciadoDescargas, 'enunciado');
     botonesDescarga($('i-teoria-archivos'), ev.detail, ev.detail.teoriaDescargas, 'teoria');
     if (!entrega) { caja.replaceChildren(); return; }
@@ -289,11 +290,21 @@
         const original = await guardarOriginal(archivo, 'resolucion');
         avisar('2/2 Carlos está revisando tu trabajo para preparar sus dudas…');
         const t = S.tarea;
-        const d = await crearDocumento({ archivo: original, codigo: t.codigo, titulo: titulo || t.titulo, curso: t.curso, tarea: t.titulo, criterios: t.criterios, estudiante: $('nombre').value.trim(), texto });
+        const envio = { archivo: original, codigo: t.codigo, titulo: titulo || t.titulo, curso: t.curso, tarea: t.titulo, criterios: t.criterios, estudiante: $('nombre').value.trim(), texto };
+        const d = await crearDocumento(envio);
         const r = await fetch('api/casos?id=' + encodeURIComponent(d.casoId));
         if (!r.ok) throw new Error('Tu trabajo se procesó, pero no se pudo cargar. Intenta de nuevo.');
         S.caso = await r.json();
         S.casoId = d.casoId;
+        S.casoUsado = false;
+        // Quien ya ensayó no llega a la entrega con las mismas dudas: se generan otras sobre el mismo trabajo.
+        window.renovarCasoEntrega = async () => {
+          const nuevo = await crearDocumento({ ...envio, estudiante: S.nombre, evitar: S.caso.puntos.map((p) => p.apertura) });
+          const rc = await fetch('api/casos?id=' + encodeURIComponent(nuevo.casoId));
+          if (!rc.ok) throw new Error('Carlos no pudo preparar las dudas nuevas. Intenta de nuevo.');
+          S.caso = await rc.json();
+          S.casoId = nuevo.casoId;
+        };
         $('i-tarea').textContent = S.caso.documento.titulo;
         chip.textContent = 'listo';
         chip.classList.add('ok');

@@ -4,7 +4,7 @@
 
 Proyecto para **DSC HACK 2026** · Reto *Educación 2036* · Grieta 02 *“Aprender sin pensar”*.
 
-**Demo:** https://defiendelo-six.vercel.app
+**Demo:** https://defiendelo-six.vercel.app · código de prueba: `DEMO-01`
 **Pitch:** *[Pendiente: pegar aquí el enlace a las diapositivas]*
 
 ---
@@ -44,10 +44,12 @@ Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 
 
 Los códigos usan un alfabeto sin caracteres confusos (sin `0/O` ni `1/I/L`) para que se puedan dictar en clase, y se aceptan en minúsculas o sin guion. El código `DEMO-01` siempre abre la tarea de demostración.
 
-### Dos modos
-| | Práctica | Evaluación |
+### Dos pasos: ensayar y entregar
+| | Ensayar (opcional) | Entregar (la tarea) |
 |---|---|---|
-| Objetivo | Ensayar antes de la entrega | Defensa registrada para el profesor |
+| Objetivo | Practicar antes de la entrega | Defensa registrada para el profesor |
+| Intentos | Los que quiera | Uno por estudiante |
+| Dudas de Carlos | Las primeras que prepara | Nuevas, si ya ensayó con ese archivo |
 | Quién ve el reporte | Solo el estudiante | El estudiante y el profesor |
 | Se guarda en el servidor | No | Sí, automáticamente |
 | Pegar texto | Permitido | Bloqueado (y se registra el intento) |
@@ -88,15 +90,16 @@ Navegador (public/)
         │ JSON
         ▼
 Capa 1 · Entrada HTTP (api/)
-  carlos · casos · tareas · sesiones · documentos
+  carlos · casos · tareas · sesiones · documentos · archivos
         │
         ▼
 Capa 2 · Lógica de negocio (modulos/)
-  defensa · casos · tareas · reportes · documentos
+  defensa · casos · tareas · reportes · documentos · archivos
         │
         ▼
 Capa 3 · Infraestructura (compartido/)
   llm.js ──▶ proveedor de IA      almacen.js ──▶ Upstash Redis o memoria
+  archivos.js ──▶ Supabase Storage
 ```
 
 | Componente | Tecnología | Decisión |
@@ -155,10 +158,10 @@ https://defiendelo-six.vercel.app
 
 **Uso:**
 1. Como profesor: *Crear tarea* → *Generar código*, y guarda el token. Como estudiante: ingresa ese código (o `DEMO-01`) y tu nombre.
-2. Si la tarea lo pide, sube tu `.pdf` o `.docx`. Elige **Práctica** o **Evaluación** y pulsa *Empezar con Carlos*.
+2. Si la tarea lo pide, sube tu `.pdf` o `.docx`. Elige **Ensayar** o **Entregar** y pulsa *Empezar con Carlos*.
 3. Carlos te hace una pregunta y resalta la parte de tu trabajo de la que habla.
-4. Pulsa **● Hablar** (en Chrome o Edge) o escribe tu explicación, y luego **Responder**.
-5. Al final verás tu trabajo marcado. En modo Evaluación, el profesor lo ve en *Ver reportes* con su código y su token.
+4. Elige responder **por voz** (en Chrome o Edge) o **por escrito**, explica y pulsa **Responder**. Puedes cambiar de modo durante la conversación.
+5. Al final verás tu trabajo marcado. Si entregaste, el profesor lo ve en *Ver reportes* con su código y su token.
 
 Si la IA no está configurada, la app funciona en **modo simulado**: el botón *Simular respuesta* llena una respuesta de ejemplo y la evaluación usa resultados predefinidos.
 
@@ -168,6 +171,8 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 
 - El profesor crea una tarea y obtiene un código, un enlace para compartir y un token privado.
 - Tareas con entrega individual o con un trabajo base común.
+- Instrucciones y teoría del curso: hasta 5 archivos por apartado, para leer y descargar.
+- Archivos originales guardados en un almacén privado y descargables con enlaces temporales.
 - Generación de 4 puntos específicos a partir del texto del trabajo, con IA o con un respaldo sin IA.
 - Subida de `.pdf` y `.docx` de hasta 10 MB, o texto pegado, de 50 a 15 000 palabras.
 - Flujo completo: código → defensa con Carlos → reporte.
@@ -185,9 +190,14 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 
 **Limitaciones actuales**
 - **Los PDF escaneados no se leen** porque no hay OCR: hace falta texto seleccionable o un `.docx`.
-- **Carlos solo lee el texto**: no ve imágenes ni diagramas. El original se puede descargar, pero la defensa se basa en el texto extraído.
+- **El alcance actual son trabajos de texto**, como informes y ensayos. Carlos no ve imágenes ni diagramas: el original se puede descargar, pero la defensa se basa en el texto extraído.
+- **Carlos no usa toda la teoría**: para preparar sus dudas toma los primeros 12 000 caracteres de teoría y 8 000 de instrucciones. El estudiante sí puede leerlas completas.
+- **El estudiante entrega un solo archivo** por defensa.
 - **Los archivos originales no se borran solos**: a diferencia de los datos en Redis, no expiran a los 60 días.
-- **No hay cuentas**: cualquiera con el código entra a la tarea, y el estudiante se identifica solo con su nombre.
+- **No hay cuentas**: cualquiera con el código entra a la tarea, y el estudiante se identifica solo con su nombre. Por eso, el límite de una entrega se puede evadir escribiendo otro nombre, y el profesor no ve quién falta si no compara con su lista.
+- **Salir a mitad de una entrega no gasta el intento**: el estudiante puede volver a empezar, con dudas nuevas si sigue en la misma página.
+- **Las dudas nuevas solo aplican a trabajos subidos por el estudiante**: en un trabajo base común, ensayo y entrega usan las mismas.
+- **No hay hora de cierre**: las entregas no se bloquean por fecha.
 - **El token del profesor se muestra una sola vez** y no se puede recuperar.
 - **El límite por IP puede afectar a una clase** que comparte la misma red.
 - **Sin Upstash, los datos viven en memoria**: en Vercel pueden perderse cuando la función se reinicia. `DEMO-01` funciona siempre.
@@ -255,6 +265,17 @@ Crea `modulos/casos/datos/<id>.json` con la misma estructura de `demo.json` (fra
 - **Cómo se entra:** gratis para profesores individuales hasta cierto número de defensas; la licencia se vende cuando varios profesores de una facultad ya lo usan.
 - **Costo:** una llamada a la IA por turno y voz procesada en el navegador, del orden de centavos de dólar por defensa.
 - **Ingreso secundario:** práctica de sustentación de tesis pagada por el estudiante.
+- **Precios propuestos, aún sin validar:** USD 3 por estudiante activo al semestre en universidades privadas, USD 1.50 en públicas y USD 4 para docentes particulares.
+
+## 🚀 Pasos a futuro
+Este es un plan, no algo ya logrado. El nicho son los universitarios de Lima.
+
+1. Piloto con estudiantes de la PUCP.
+2. Otras universidades de Lima, luego de todo el Perú.
+3. Pruebas con colegios.
+4. Ecuador y Colombia.
+
+También queremos leer imágenes, diagramas y PDF escaneados, sumar cuentas y hora de cierre, y conectarnos con Classroom.
 
 ## 👥 Equipo
 - **William:** tareas, almacenamiento, reportes y panel del profesor.
