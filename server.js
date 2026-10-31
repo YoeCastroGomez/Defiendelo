@@ -26,7 +26,8 @@ async function cargarApi(nombre) {
 
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const PUERTO = process.env.PORT || 3000;
-const MAX_BODY_BYTES = 1024 * 1024; // 1 MB para peticiones JSON (el texto extraído de PDF/DOCX llega como JSON)
+// Igual que el límite de Vercel para el cuerpo de una función (4,5 MB): en local y desplegado se acepta lo mismo.
+const MAX_BODY_BYTES = 4.5 * 1024 * 1024;
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');

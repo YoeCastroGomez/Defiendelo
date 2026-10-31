@@ -115,8 +115,8 @@
         <legend class="etq">Qué quieres hacer</legend>
         <label class="opcion"><input type="radio" name="modo" value="practica" checked>
           <span><b>Ensayar</b><br><span class="suave">No se envía a tu profesor y tu tarea sigue sin entregar. Puedes repetirlo las veces que quieras.</span></span></label>
-        <label class="opcion"><input type="radio" name="modo" value="evaluacion">
-          <span><b>Entregar</b><br><span class="suave">Tu profesor recibe el reporte. Tienes un solo intento y Carlos trae dudas nuevas.</span></span></label>
+        <label class="opcion" id="op-entregar"><input type="radio" name="modo" value="evaluacion">
+          <span><b>Entregar</b><br><span class="suave" id="op-entregar-txt">Tu profesor recibe el reporte. Tienes un solo intento y Carlos trae dudas nuevas.</span></span></label>
       </fieldset>
 
       <fieldset>
@@ -270,7 +270,11 @@
           <p class="mono chico suave" id="p-info-curso"></p>
           <h2 id="p-info-titulo" style="font-size:20px;font-weight:600"></h2>
         </div>
-        <span class="mono chico suave" id="p-info-foco"></span>
+        <div class="pila-c" style="align-items:flex-end;gap:6px">
+          <span class="mono chico suave" id="p-info-foco"></span>
+          <span class="mono chico suave" id="p-info-estado"></span>
+          <button class="btn claro" type="button" id="b-cerrar-tarea">Cerrar entregas</button>
+        </div>
       </div>
 
       <section class="kpis-profe" aria-label="Resumen ejecutivo">
@@ -320,6 +324,7 @@
 <div id="marca-agua" aria-hidden="true"></div>
 <div id="velo" aria-hidden="true">Vuelve a esta ventana para seguir con Carlos.</div>
 
+<script src="js/senales.js"></script>
 <script src="app.js"></script>
 <script src="js/subir.js"></script>
 </body>

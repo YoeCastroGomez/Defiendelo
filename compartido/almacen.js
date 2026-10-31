@@ -31,6 +31,15 @@ export async function guardar(clave, valor) {
   return 'OK';
 }
 
+// Cambia el valor de una clave que ya existe, sin renovar su vencimiento. Devuelve null si no existe.
+export async function reemplazar(clave, valor) {
+  const txt = JSON.stringify(valor);
+  if (persistente()) return redis(['SET', clave, txt, 'XX', 'KEEPTTL']);
+  if (!memoria.has(clave)) return null;
+  memoria.set(clave, txt);
+  return 'OK';
+}
+
 export async function leer(clave) {
   const txt = persistente() ? await redis(['GET', clave]) : memoria.get(clave);
   return txt ? JSON.parse(txt) : null;

@@ -2,17 +2,12 @@
 import { randomBytes } from 'node:crypto';
 import { archivosConfigurado, crearEnlaceSubida, crearEnlaceDescarga } from '../../compartido/archivos.js';
 import { listar } from '../../compartido/almacen.js';
+import { errorHttp } from '../../compartido/http.js';
 import { cargarCaso } from '../casos/casos.js';
 import { archivosDeInstrucciones, obtenerTareaInterna, verificarTokenProfesor } from '../tareas/tareas.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const CARPETAS = { enunciado: 'enunciados', resolucion: 'resoluciones' };
-
-function errorHttp(mensaje, status) {
-  const e = new Error(mensaje);
-  e.status = status;
-  return e;
-}
 
 function exigirConfiguracion() {
   if (!archivosConfigurado()) throw errorHttp('El guardado de archivos no está disponible', 503);

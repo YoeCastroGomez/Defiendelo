@@ -40,7 +40,8 @@
       + (Number(senales.pantallaOculta) || 0)
       + (Number(senales.pegadoBloqueado) || 0)
       + (Number(senales.captura) || 0)
-      + (senales.iaCaida ? 1 : 0);
+      + (senales.iaCaida ? 1 : 0)
+      + (Number(senales.sinRegistro) || 0);
   }
 
   function formatearDuracion(seg) {
@@ -103,15 +104,12 @@
       const res = await fetch('api/sesiones', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        // Los niveles por punto no se envían: el servidor arma el reporte con lo que registró en el intento.
+        // Solo viajan las señales que únicamente el navegador puede observar.
         body: JSON.stringify({
-          codigo: S.tarea.codigo,
-          casoId: S.casoId || S.tarea.casoId || 'demo',
-          nombre: S.nombre,
           modo: 'evaluacion',
-          duracionSegundos,
-          resultados: S.resultados,
-          senales: S.senales,
-          intento: String(S.t0),
+          intento: S.intento,
+          senales: { pantallaOculta: S.senales.pantallaOculta, pegadoBloqueado: S.senales.pegadoBloqueado, captura: S.senales.captura },
         }),
       });
       const d = await res.json();
@@ -157,28 +155,19 @@
   };
 
   /* ---------- 3. Carga de caso para pintar el documento de cada estudiante ---------- */
+  // Un trabajo subido es privado: el profesor lo abre con el código de su tarea y su token.
   async function obtenerCasoParaPanel(casoId) {
     const id = casoId && casoId !== 'estudiante' ? casoId : 'demo';
     if (casosCache.has(id)) return casosCache.get(id);
-
     try {
-      const rApi = await fetch('api/casos?id=' + encodeURIComponent(id));
+      const q = new URLSearchParams({ id, codigo: estadoPanel.tarea?.codigo || '' });
+      const rApi = await fetch('api/casos?' + q, { headers: { 'x-token-profesor': ($('p-token').value || '').trim() } });
       if (rApi.ok) {
         const c = await rApi.json();
         casosCache.set(id, c);
         return c;
       }
-    } catch { /* fallback local antes de integrar api/casos */ }
-
-    try {
-      const rEst = await fetch(`casos/${encodeURIComponent(id)}.json`);
-      if (rEst.ok) {
-        const c = await rEst.json();
-        casosCache.set(id, c);
-        return c;
-      }
-    } catch { /* caso dinámico no accesible */ }
-
+    } catch { /* sin conexión: el detalle se muestra sin el trabajo marcado */ }
     return null;
   }
 
@@ -401,6 +390,7 @@
     if (s.pegadoBloqueado) alertas.push(`${s.pegadoBloqueado} intento(s) de pegar texto`);
     if (s.captura) alertas.push(`${s.captura} intento(s) de captura o impresión`);
     if (s.iaCaida) alertas.push('evaluada parcialmente en modo respaldo');
+    if (s.sinRegistro) alertas.push(`${s.sinRegistro} punto(s) sin evaluación registrada en el servidor (cuentan como rojo)`);
 
     if (alertas.length) {
       const hSen = document.createElement('h2');
@@ -522,6 +512,7 @@
       $('p-info-curso').textContent = `${d.tarea.curso}${d.tarea.profesor ? ' · ' + d.tarea.profesor : ''} · código ${d.tarea.codigo}`;
       $('p-info-titulo').textContent = d.tarea.titulo;
       $('p-info-foco').textContent = d.tarea.casoId === 'estudiante' ? 'entrega individual por estudiante' : `caso base: ${d.tarea.casoId}`;
+      mostrarEstadoTarea(d.tarea);
 
       renderizarKPIs(estadoPanel.sesiones);
       renderizarListaEstudiantes(estadoPanel.sesiones);
@@ -539,6 +530,38 @@
       $('b-exportar-csv').classList.add('oculto');
     } finally {
       $('b-consultar-panel').disabled = false;
+    }
+  }
+
+  /* ---------- 6. Cerrar o reabrir la tarea ---------- */
+  function mostrarEstadoTarea(tarea) {
+    const demo = tarea.codigo === 'DEMO-01';
+    $('p-info-estado').textContent = demo ? '' : tarea.cerrada ? 'cerrada: no recibe entregas nuevas' : 'abierta: recibe entregas';
+    $('b-cerrar-tarea').classList.toggle('oculto', demo);
+    $('b-cerrar-tarea').textContent = tarea.cerrada ? 'Reabrir entregas' : 'Cerrar entregas';
+  }
+
+  async function alternarCierre() {
+    const tarea = estadoPanel.tarea;
+    if (!tarea) return;
+    const cerrar = !tarea.cerrada;
+    if (cerrar && !window.confirm('¿Cerrar las entregas? Quien ya empezó puede terminar, pero nadie más podrá entregar. Puedes reabrirla después.')) return;
+    const boton = $('b-cerrar-tarea');
+    boton.disabled = true;
+    try {
+      const res = await fetch('api/tareas?codigo=' + encodeURIComponent(tarea.codigo), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', 'x-token-profesor': ($('p-token').value || '').trim() },
+        body: JSON.stringify({ cerrada: cerrar }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'No se pudo cambiar el estado de la tarea');
+      tarea.cerrada = d.cerrada;
+      mostrarEstadoTarea(tarea);
+    } catch (err) {
+      $('panel-err').textContent = err.message;
+    } finally {
+      boton.disabled = false;
     }
   }
 
@@ -634,6 +657,7 @@
       if (guardado && !$('p-token').value) $('p-token').value = guardado;
     });
   }
+  if ($('b-cerrar-tarea')) $('b-cerrar-tarea').onclick = alternarCierre;
   if ($('p-token')) {
     $('p-token').addEventListener('input', () => { $('panel-err').textContent = ''; });
   }

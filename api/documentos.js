@@ -1,5 +1,6 @@
 // POST /api/documentos → recibe el texto extraído de un trabajo (.pdf o .docx, extraído en el navegador),
-// lo fragmenta, genera los 4 puntos tipados de la defensa y guarda el caso.
+// lo fragmenta, genera los 4 puntos tipados de la defensa y guarda el caso. Devuelve una `llave`:
+// el trabajo subido solo se vuelve a abrir con ella (cabecera x-llave-caso), porque es privado.
 // GET  /api/documentos  → límites y si hay IA configurada.
 import { randomBytes } from 'node:crypto';
 import { guardar, persistente } from '../compartido/almacen.js';
@@ -7,9 +8,11 @@ import { generarCaso, MIN_PALABRAS, MAX_PALABRAS } from '../modulos/documentos/g
 import { proveedorConfigurado } from '../compartido/llm.js';
 import { obtenerTareaInterna } from '../modulos/tareas/tareas.js';
 import { limpiarArchivo } from '../compartido/archivos.js';
+import { limpio, superaLimite, cuerpo } from '../compartido/http.js';
 
-const nuevoCasoId = () => 'doc-' + randomBytes(5).toString('hex');
-const limpio = (v, max) => String(v || '').trim().slice(0, max);
+// Cada trabajo cuesta hasta 2 llamadas largas a la IA: el límite evita que alguien agote el presupuesto.
+const MAX_POR_MINUTO = 6;
+const nuevoCasoId = () => 'doc-' + randomBytes(8).toString('hex');
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -17,7 +20,8 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'método no permitido' });
   try {
-    const b = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+    if (await superaLimite(req, 'documentos', MAX_POR_MINUTO)) return res.status(429).json({ error: 'Demasiados trabajos procesados seguidos. Espera un minuto e intenta de nuevo.' });
+    const b = cuerpo(req);
     const texto = typeof b.texto === 'string' ? b.texto : '';
     if (!texto.trim()) return res.status(400).json({ error: 'Falta el texto del trabajo' });
 
@@ -36,16 +40,19 @@ export default async function handler(req, res) {
     if (b.codigo) {
       const t = await obtenerTareaInterna(b.codigo);
       if (!t) return res.status(404).json({ error: 'No existe una tarea con ese código' });
-      Object.assign(datos, { curso: t.curso, tarea: t.titulo, criterios: t.criterios, enunciado: t.enunciado, teoria: t.teoria });
+      Object.assign(datos, { curso: t.curso, tarea: t.titulo, criterios: t.criterios, enunciado: t.enunciado, teoria: t.teoria, codigo: t.codigo });
     }
 
     const { caso } = await generarCaso({ ...datos, id: nuevoCasoId() });
     caso.archivo = limpiarArchivo(b.archivo, 'resolucion');
+    caso.llave = randomBytes(16).toString('hex');
+    if (datos.codigo) caso.codigo = datos.codigo; // la tarea para la que se subió
     // `guardar` no sobrescribe: si el id ya estaba tomado, se reetiqueta el caso y se reintenta.
     for (let k = 0; k < 5; k++) {
       if (await guardar('caso:' + caso.id, caso)) {
         return res.status(201).json({
           casoId: caso.id,
+          llave: caso.llave,
           titulo: caso.documento.titulo,
           fragmentos: caso.documento.fragmentos.length,
           puntos: caso.puntos.length,

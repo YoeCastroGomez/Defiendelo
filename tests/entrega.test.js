@@ -6,8 +6,11 @@ for (const v of ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL', 'UPSTASH_REDIS_REST
 
 const { default: apiTareas } = await import('../api/tareas.js');
 const { default: apiSesiones } = await import('../api/sesiones.js');
+const { default: apiIntentos } = await import('../api/intentos.js');
+const { default: apiCarlos } = await import('../api/carlos.js');
 const { generarCaso } = await import('../modulos/documentos/generador.js');
 
+let ip = 0;
 async function llamar(handler, { method = 'GET', query = {}, body, headers = {} } = {}) {
   const salida = { status: 200, json: undefined };
   const res = {
@@ -17,48 +20,58 @@ async function llamar(handler, { method = 'GET', query = {}, body, headers = {} 
     send() { return res; },
     end() { return res; },
   };
-  await handler({ method, query, body, headers, socket: { remoteAddress: '10.2.0.1' } }, res);
+  await handler({ method, query, body, headers, socket: { remoteAddress: `10.2.0.${++ip}` } }, res);
   return salida;
 }
 
 const nuevaTarea = async () => (await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'demo' } })).json;
-const entrega = (codigo, nombre, intento) => ({
-  codigo, casoId: 'demo', nombre, modo: 'evaluacion', intento,
-  resultados: { p1: { tema: 'X', tipo: 'decision', nivel: 'verde' } },
-  senales: {},
-});
-const enviar = (cuerpo) => llamar(apiSesiones, { method: 'POST', body: cuerpo });
+const abrir = (codigo, nombre) => llamar(apiIntentos, { method: 'POST', body: { codigo, nombre } });
+async function entregar(codigo, nombre) {
+  const a = await abrir(codigo, nombre);
+  if (a.status !== 201) return a;
+  await llamar(apiCarlos, { method: 'POST', body: { intento: a.json.intento, puntoId: 'p1', historial: [{ rol: 'estudiante', texto: 'No sé.' }] } });
+  return Object.assign(await llamar(apiSesiones, { method: 'POST', body: { modo: 'evaluacion', intento: a.json.intento } }), { intento: a.json.intento });
+}
 
 describe('una sola entrega por estudiante', () => {
   test('la segunda entrega se rechaza aunque cambien mayúsculas, tildes o espacios', async () => {
     const { codigo } = await nuevaTarea();
-    assert.equal((await enviar(entrega(codigo, 'José Pérez', '1'))).status, 201);
-    const otra = await enviar(entrega(codigo, '  jose   PEREZ ', '2'));
+    assert.equal((await entregar(codigo, 'José Pérez')).status, 201);
+    const otra = await abrir(codigo, '  jose   PEREZ ');
     assert.equal(otra.status, 409);
   });
 
-  test('reintentar el mismo intento no crea otra entrega', async () => {
+  test('si dos intentos se abrieron antes de entregar, el segundo cierre se rechaza', async () => {
+    const { codigo } = await nuevaTarea();
+    const a = await abrir(codigo, 'Luz');
+    const b = await abrir(codigo, 'luz');
+    for (const x of [a, b]) await llamar(apiCarlos, { method: 'POST', body: { intento: x.json.intento, puntoId: 'p1', historial: [{ rol: 'estudiante', texto: 'No sé.' }] } });
+    assert.equal((await llamar(apiSesiones, { method: 'POST', body: { modo: 'evaluacion', intento: a.json.intento } })).status, 201);
+    assert.equal((await llamar(apiSesiones, { method: 'POST', body: { modo: 'evaluacion', intento: b.json.intento } })).status, 409);
+  });
+
+  test('reintentar el cierre del mismo intento no crea otra entrega', async () => {
     const { codigo, tokenProfesor } = await nuevaTarea();
-    const a = await enviar(entrega(codigo, 'Ana', '77'));
-    const b = await enviar(entrega(codigo, 'Ana', '77'));
+    const a = await entregar(codigo, 'Ana');
+    const b = await llamar(apiSesiones, { method: 'POST', body: { modo: 'evaluacion', intento: a.intento } });
     assert.equal(b.status, 201);
     assert.equal(b.json.id, a.json.id);
     const panel = await llamar(apiSesiones, { query: { codigo }, headers: { 'x-token-profesor': tokenProfesor } });
     assert.equal(panel.json.sesiones.length, 1);
   });
 
-  test('otro estudiante sí puede entregar, y se puede consultar quién ya entregó', async () => {
+  test('otro estudiante sí puede entregar, y ya no se puede consultar quién entregó sin el token', async () => {
     const { codigo } = await nuevaTarea();
-    await enviar(entrega(codigo, 'Ana', '1'));
-    assert.equal((await enviar(entrega(codigo, 'Beto', '2'))).status, 201);
-    const si = await llamar(apiSesiones, { query: { codigo, nombre: 'ana' } });
-    const no = await llamar(apiSesiones, { query: { codigo, nombre: 'Carla' } });
-    assert.deepEqual([si.json.entregada, no.json.entregada], [true, false]);
+    await entregar(codigo, 'Ana');
+    assert.equal((await entregar(codigo, 'Beto')).status, 201);
+    const consulta = await llamar(apiSesiones, { query: { codigo, nombre: 'ana' } });
+    assert.equal(consulta.status, 401);
+    assert.equal(consulta.json.entregada, undefined);
   });
 
   test('DEMO-01 se puede repetir, porque es la tarea de prueba', async () => {
-    assert.equal((await enviar(entrega('DEMO-01', 'Jurado', '1'))).status, 201);
-    assert.equal((await enviar(entrega('DEMO-01', 'Jurado', '2'))).status, 201);
+    assert.equal((await entregar('DEMO-01', 'Jurado')).status, 201);
+    assert.equal((await entregar('DEMO-01', 'Jurado')).status, 201);
   });
 });
 

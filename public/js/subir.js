@@ -292,18 +292,21 @@
         const t = S.tarea;
         const envio = { archivo: original, codigo: t.codigo, titulo: titulo || t.titulo, curso: t.curso, tarea: t.titulo, criterios: t.criterios, estudiante: $('nombre').value.trim(), texto };
         const d = await crearDocumento(envio);
-        const r = await fetch('api/casos?id=' + encodeURIComponent(d.casoId));
+        // El trabajo es privado: solo se vuelve a abrir con la llave que devolvió el servidor.
+        const r = await fetch('api/casos?id=' + encodeURIComponent(d.casoId), { headers: { 'x-llave-caso': d.llave } });
         if (!r.ok) throw new Error('Tu trabajo se procesó, pero no se pudo cargar. Intenta de nuevo.');
         S.caso = await r.json();
         S.casoId = d.casoId;
+        S.llave = d.llave;
         S.casoUsado = false;
         // Quien ya ensayó no llega a la entrega con las mismas dudas: se generan otras sobre el mismo trabajo.
         window.renovarCasoEntrega = async () => {
           const nuevo = await crearDocumento({ ...envio, estudiante: S.nombre, evitar: S.caso.puntos.map((p) => p.apertura) });
-          const rc = await fetch('api/casos?id=' + encodeURIComponent(nuevo.casoId));
+          const rc = await fetch('api/casos?id=' + encodeURIComponent(nuevo.casoId), { headers: { 'x-llave-caso': nuevo.llave } });
           if (!rc.ok) throw new Error('Carlos no pudo preparar las dudas nuevas. Intenta de nuevo.');
           S.caso = await rc.json();
           S.casoId = nuevo.casoId;
+          S.llave = nuevo.llave;
         };
         $('i-tarea').textContent = S.caso.documento.titulo;
         chip.textContent = 'listo';
@@ -410,7 +413,9 @@
       avisar('2/2 Preparando las dudas de Carlos…');
       const tituloBase = titulo || $('t-titulo').value;
       const d = await crearDocumento({ archivo: original, titulo: tituloBase, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
-      selector.querySelector('option[value="subir"]').before(nuevaOpcion(d.casoId, 'Trabajo subido: ' + d.titulo));
+      const opcion = nuevaOpcion(d.casoId, 'Trabajo subido: ' + d.titulo);
+      opcion.dataset.llave = d.llave; // la tarea solo puede usar este trabajo si presenta su llave
+      selector.querySelector('option[value="subir"]').before(opcion);
       selector.value = d.casoId;
       actualizarOrigen();
     },
