@@ -137,10 +137,7 @@ textarea::placeholder{color:#7D8086}
 @keyframes pulsoUrgente{0%,100%{opacity:1}50%{opacity:.5}}
 
 /* protección contra capturas */
-#marca-agua,#velo{display:none;position:fixed;inset:0;z-index:50}
-#marca-agua{pointer-events:none;overflow:hidden;white-space:pre-wrap;word-spacing:8px;font-family:var(--mono);font-size:15px;line-height:90px;color:#808080;opacity:.13;transform:rotate(-20deg) scale(1.5)}
-#velo{z-index:60;align-items:center;justify-content:center;padding:24px;text-align:center;background:var(--osc);color:var(--osc-txt);font-size:18px}
-body.protegido #marca-agua{display:block}
+#velo{display:none;position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;padding:24px;text-align:center;background:var(--osc);color:var(--osc-txt);font-size:18px}
 body.protegido.velado #velo{display:flex}
 body.protegido #defensa{-webkit-user-select:none;user-select:none}
 body.protegido #resp{-webkit-user-select:text;user-select:text}

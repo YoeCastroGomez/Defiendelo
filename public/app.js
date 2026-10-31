@@ -433,7 +433,6 @@ async function empezar() {
   S.respuesta = document.querySelector('input[name=respuesta]:checked').value;
   S.i = 0; S.resultados = {}; S.t0 = Date.now(); S.respondio = false; S.entregaConfirmada = false;
   S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false, tiempoAgotado: 0 };
-  $('marca-agua').textContent = `${S.nombre} · ${S.tarea.codigo}   `.repeat(120);
   $('d-modo').textContent = S.tipo === 'practica' ? 'práctica' : 'evaluación';
   $('d-titulo').textContent = S.caso.documento.titulo;
   S.forzarSim = false;
