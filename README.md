@@ -132,6 +132,12 @@ Capa 3 · Infraestructura (compartido/)
 
 Una sola llamada por turno mantiene el costo en centavos por defensa.
 
+### Cómo se preparan las dudas de un documento
+- **Dos prompts distintos.** El trabajo propio de un estudiante se analiza como una resolución. El documento común que deja el profesor (una lectura, un caso) se analiza para comprobar que el estudiante lo entendió.
+- **Presupuesto de tiempo.** La IA tiene 26 s en total, dentro de los 30 s de Vercel. Si el primer intento falla y queda tiempo, se reintenta; si la respuesta llegó cortada, el reintento pide campos más breves.
+- **Gemini sin "pensamiento".** En los modelos que lo permiten, incluidos los alias `-latest`, se desactiva el razonamiento interno, que gasta el mismo presupuesto de tokens que la respuesta y podía cortar el JSON. Si un modelo no lo admite, se reintenta sin esa opción.
+- **Respaldo.** Si aun así la IA no devuelve los 4 puntos, Carlos usa dudas básicas armadas a partir del texto y se muestra un aviso para volver a intentarlo. Nadie queda bloqueado. En los registros del servidor queda la causa: `tiempo`, `red`, `proveedor`, `cortada`, `vacia` o `formato`.
+
 ### Cómo se registra una entrega
 1. Al pulsar *Empezar* en modo **Entregar**, el navegador pide un intento a `POST /api/intentos`. El servidor rechaza ahí una segunda entrega con el mismo nombre (409) o una tarea cerrada (403), y fija qué trabajo se defiende.
    - **Hay un solo intento vigente por estudiante y tarea.** Si el estudiante ya había respondido algo y vuelve a empezar, se entrega lo que llevaba (marcado como *abandonada*) y no se abre otro. Un intento sin ninguna respuesta sí se puede reemplazar, y el anterior deja de servir.

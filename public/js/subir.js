@@ -319,7 +319,7 @@
         chip.textContent = 'listo';
         chip.classList.add('ok');
         $('b-empezar').disabled = false;
-        vista.listo(`Listo: ${d.fragmentos} partes y ${d.puntos} dudas de Carlos.`);
+        vista.listo(`Listo: ${d.fragmentos} partes y ${d.puntos} dudas de Carlos.` + (d.aviso ? ' ' + d.aviso : ''));
       },
     });
   });
@@ -424,7 +424,7 @@
     const fila = document.createElement('div');
     fila.className = 'archivo';
     const nombre = document.createElement('span');
-    nombre.textContent = 'Listo: ' + base.titulo;
+    nombre.textContent = 'Listo: ' + base.titulo + (base.aviso ? ' — ' + base.aviso : '');
     const cambiar = document.createElement('button');
     cambiar.type = 'button';
     cambiar.className = 'enlace-texto';
@@ -440,8 +440,8 @@
       avisar('Guardando tu archivo…');
       const original = await guardarOriginal(archivo, 'base');
       avisar('2/2 Preparando las dudas de Carlos…');
-      const d = await crearDocumento({ archivo: original, titulo: titulo || $('t-titulo').value, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
-      base = { casoId: d.casoId, llave: d.llave, titulo: d.titulo };
+      const d = await crearDocumento({ comun: true, archivo: original, titulo: titulo || $('t-titulo').value, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
+      base = { casoId: d.casoId, llave: d.llave, titulo: d.titulo, aviso: d.aviso };
       mostrarBase();
       actualizarOrigen();
     },
