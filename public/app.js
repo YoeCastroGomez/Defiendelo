@@ -154,8 +154,10 @@ function pintarDoc(cont, opts) {
 }
 
 /* ---------- entrada, código y profesor ---------- */
+// DEMO-01 tiene otro formato que los códigos normales (ABC-DEF): "demo01" no debe volverse "DEM-O01".
 const normCodigo = (c) => {
   c = (c || '').toUpperCase().replace(/[\s_]/g, '');
+  if (c.replace(/-/g, '') === 'DEMO01') return 'DEMO-01';
   return /^[A-Z0-9]{6}$/.test(c) ? c.slice(0, 3) + '-' + c.slice(3) : c;
 };
 

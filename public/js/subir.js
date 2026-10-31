@@ -92,9 +92,14 @@
     }
   }
 
-  function validarPalabras(texto, minimo, maximo) {
+  // El consejo del PDF escaneado solo tiene sentido si el texto salió de un archivo, no si se pegó.
+  function validarPalabras(texto, minimo, maximo, deArchivo) {
     const n = contarPalabras(texto);
-    if (n < minimo) return `Solo se leyeron ${n} palabras (mínimo ${minimo}). Si es un PDF escaneado, sube un PDF con texto seleccionable o un archivo .docx.`;
+    if (n < minimo) {
+      return deArchivo
+        ? `Solo se leyeron ${n} palabras (mínimo ${minimo}). Si es un PDF escaneado, sube un PDF con texto seleccionable o un archivo .docx.`
+        : `El texto tiene ${n} palabras y el mínimo es ${minimo}. Pega tu trabajo completo.`;
+    }
     if (n > maximo) return `El documento tiene ${n} palabras y el máximo es ${maximo.toLocaleString('es-PE')}. Sube solo la parte necesaria.`;
     return '';
   }
@@ -161,7 +166,7 @@
       ocupado(true);
       try {
         const texto = await obtenerTexto();
-        const mal = validarPalabras(texto, minimo, maximo);
+        const mal = validarPalabras(texto, minimo, maximo, !!archivo);
         if (mal) throw new Error(mal);
         await procesar(texto, titulo, (m) => { estado.textContent = m; }, archivo);
         return true;
