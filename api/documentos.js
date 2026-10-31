@@ -24,6 +24,7 @@ export default async function handler(req, res) {
       titulo: limpio(b.titulo, 120),
       curso: limpio(b.curso, 80),
       tarea: limpio(b.tarea, 120),
+      criterios: limpio(b.criterios, 600),
       estudiante: limpio(b.estudiante, 80),
       universidadId: 'demo',
     };
@@ -45,6 +46,7 @@ export default async function handler(req, res) {
     }
     return res.status(500).json({ error: 'No se pudo guardar el caso, intenta de nuevo' });
   } catch (e) {
-    res.status(e.status || 500).json({ error: e.message });
+    if (!e.status) console.error('[api/documentos]', e.message);
+    res.status(e.status || 500).json({ error: e.status ? e.message : 'No se pudo procesar el trabajo. Intenta de nuevo.' });
   }
 }

@@ -254,7 +254,8 @@ function mejorFragmento(texto, fragmentos, posicion = 0) {
 /* ---------- puntos ---------- */
 
 function promptSistema(datos, fragmentos) {
-  return `Preparas una defensa oral para la app Defiéndelo. Un estudiante subió su trabajo del curso "${datos.curso}" ("${datos.tarea}") y Carlos, un compañero de clase conducido por IA, lo va a interrogar.
+  return `Preparas una defensa oral para la app Defiéndelo. Un estudiante subió su trabajo del curso "${datos.curso}" ("${datos.tarea}") y Carlos, un compañero de clase conducido por IA, lo va a interrogar.${datos.criterios ? `
+El profesor espera que el estudiante pueda explicar: ${datos.criterios}` : ''}
 
 ${CARLOS.nombre}: ${CARLOS.perfil} Habla en español peruano informal, frases cortas, sin tecnicismos que no sepa. NO es profesor ni examinador: es un compañero que quiere entender.
 
@@ -408,7 +409,7 @@ export function puntosDeterministas(fragmentos) {
 // Genera los 4 puntos con IA (un reintento si el JSON falla) o sin ella.
 export async function generarPuntos(datos, fragmentos) {
   if (!proveedorConfigurado()) {
-    return { puntos: puntosDeterministas(fragmentos), titulo: '', modoGeneracion: 'determinista' };
+    return { puntos: puntosDeterministas(fragmentos), titulo: '', modoGeneracion: 'simulado' };
   }
   const sistema = promptSistema(datos, fragmentos);
   const doc = documentoParaPrompt(fragmentos);
@@ -427,7 +428,8 @@ export async function generarPuntos(datos, fragmentos) {
       ultimo = e;
     }
   }
-  const e = new Error(`La IA no devolvió puntos utilizables: ${ultimo ? ultimo.message : 'error desconocido'}`);
+  console.error('[documentos]', ultimo ? ultimo.message : 'error desconocido');
+  const e = new Error('La IA no pudo estructurar los puntos del documento; intenta nuevamente.');
   e.status = 502;
   throw e;
 }
@@ -435,7 +437,7 @@ export async function generarPuntos(datos, fragmentos) {
 /* ---------- caso completo ---------- */
 
 // Texto extraído -> caso con la misma estructura que public/casos/demo.json.
-export async function generarCaso({ id, texto, titulo, curso, tarea, estudiante, universidadId = 'demo' }) {
+export async function generarCaso({ id, texto, titulo, curso, tarea, criterios, estudiante, universidadId = 'demo' }) {
   const palabras = contarPalabras(normalizar(texto));
   if (palabras < MIN_PALABRAS) {
     const e = new Error(`Solo se leyeron ${palabras} palabras del archivo (mínimo ${MIN_PALABRAS}). Si es un PDF escaneado o de fotos, el texto no se puede extraer: sube el archivo original (.docx o un PDF con texto seleccionable).`);
@@ -452,6 +454,7 @@ export async function generarCaso({ id, texto, titulo, curso, tarea, estudiante,
   const datos = {
     curso: recortar(curso, 80) || 'Curso no indicado',
     tarea: recortar(tarea, 120) || recortar(titulo, 120) || tituloDesdeTexto(texto),
+    criterios: recortar(criterios, 600),
   };
   const { puntos, titulo: tituloIA, modoGeneracion } = await generarPuntos(datos, fragmentos);
 
