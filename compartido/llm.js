@@ -36,10 +36,18 @@ export async function llamarLLM(sistema, mensajes, opciones = {}) {
 
   if (p === 'gemini') {
     const modelo = (model || 'gemini-2.5-flash').trim().replace(/^models\//, '');
+    const genConfig = {
+      temperature: 0.3,
+      maxOutputTokens: maxTokens,
+      responseMimeType: 'application/json',
+    };
+    if (modelo.includes('2.5')) {
+      genConfig.thinkingConfig = { thinkingBudget: 0 };
+    }
     const cuerpoGemini = {
       systemInstruction: { parts: [{ text: sistema }] },
       contents: mensajes.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-      generationConfig: { temperature: 0.4, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
+      generationConfig: genConfig,
     };
     let d;
     try {
@@ -48,9 +56,10 @@ export async function llamarLLM(sistema, mensajes, opciones = {}) {
         cuerpoGemini);
     } catch (err) {
       if (err.message && err.message.includes('404') && modelo !== 'gemini-1.5-flash') {
+        const genConfig15 = { temperature: 0.3, maxOutputTokens: maxTokens, responseMimeType: 'application/json' };
         d = await post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
           { 'x-goog-api-key': key },
-          cuerpoGemini);
+          { ...cuerpoGemini, generationConfig: genConfig15 });
       } else {
         throw err;
       }
@@ -59,7 +68,11 @@ export async function llamarLLM(sistema, mensajes, opciones = {}) {
     if (!cand?.content?.parts) {
       throw new Error(`Gemini no generó contenido (finishReason: ${cand?.finishReason || 'desconocido'})`);
     }
-    return cand.content.parts.map((x) => x.text || '').join('');
+    const textoLimpio = cand.content.parts
+      .filter((x) => !x.thought)
+      .map((x) => x.text || '')
+      .join('');
+    return textoLimpio || cand.content.parts.map((x) => x.text || '').join('');
   }
 
   const bases = {

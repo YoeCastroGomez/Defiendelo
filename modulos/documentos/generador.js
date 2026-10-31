@@ -259,15 +259,16 @@ El profesor espera que el estudiante pueda explicar: ${datos.criterios}` : ''}${
 
 ${CARLOS.nombre}: ${CARLOS.perfil} Habla en español peruano informal, frases cortas, sin tecnicismos que no sepa. NO es profesor ni examinador: es un compañero que quiere entender.
 
-Tu tarea: leer el trabajo y escribir EXACTAMENTE 4 puntos de defensa, en este orden y con este propósito pedagógico:
-- p1, tipo "decision": por qué el estudiante tomó una decisión clave de SU trabajo. "error_de_carlos" debe ser null.
-- p2, tipo "trampa": una confusión que Carlos sostiene con seguridad sobre un concepto central del trabajo. "error_de_carlos" obligatorio.
-- p3, tipo "trampa": una falsa equivalencia o suposición errónea de Carlos ("X es lo mismo que Y", "eso da igual") en OTRA sección distinta a la de p2. "error_de_carlos" obligatorio.
-- p4, tipo "condicion": un cambio de condición o un requerimiento nuevo e inesperado aplicado al trabajo ("¿Y si ahora nos piden...?"). "error_de_carlos" puede ser un texto o null.
+Tu tarea: leer el trabajo entregado por el estudiante y formular EXACTAMENTE 4 puntos de defensa con Carlos, en este orden y con este propósito pedagógico:
+- p1, tipo "decision": por qué se usa o justifica ese diseño, técnica o concepto frente a alternativas (si es un texto conceptual o teórico, pregúntale por qué se aplica o prefiere ese concepto, ej. por qué usar swapping en vez de dejar todo en RAM). "error_de_carlos" debe ser null.
+- p2, tipo "trampa": una confusión que Carlos sostiene con seguridad sobre el primer concepto o aspecto central. "error_de_carlos" obligatorio.
+- p3, tipo "trampa": una falsa equivalencia o suposición errónea de Carlos (creer que dos conceptos son lo mismo o intercambiables, o confundir el segundo concepto). "error_de_carlos" obligatorio.
+- p4, tipo "condicion": un cambio de condición o un requerimiento nuevo en un escenario real ("¿Y si ahora se llena la memoria / cambian los recursos...?"). "error_de_carlos" puede ser un texto o null.
 
 Reglas:
-- Todo debe salir del contenido real del trabajo: menciona sus conceptos, decisiones y nombres propios. Nada genérico.
-- "fragmento" es el id de un fragmento existente de la lista ([f1], [f2], ...), el que el estudiante necesita mirar para responder. Usa un fragmento distinto en cada punto.
+- Todo debe salir del contenido real del trabajo: menciona sus conceptos, decisiones y nombres propios.
+- Incluso si el trabajo del estudiante es breve, conceptual o respuestas a preguntas teóricas, DEBES formular los 4 puntos adaptados a los conceptos presentes. NUNCA respondas con negativas ni texto fuera del JSON.
+- "fragmento" es el id de un fragmento existente de la lista ([f1], [f2], ...), el que el estudiante necesita mirar para responder. Usa un fragmento distinto en cada punto si es posible.
 - "apertura" es lo que Carlos dice para abrir el punto: máximo 2 oraciones, en primera persona, con su confusión incluida si la tiene. Nunca revela la respuesta.
 - "que_debe_explicar" es la pauta para el evaluador (no se le muestra al estudiante): qué tendría que cubrir una buena explicación.
 - "simulado" es una respuesta de ejemplo del estudiante para el modo de demostración, con su nivel ("verde", "amarillo" o "rojo") y el motivo en tercera persona.
