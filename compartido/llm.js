@@ -35,8 +35,7 @@ export async function llamarLLM(sistema, mensajes, opciones = {}) {
   }
 
   if (p === 'gemini') {
-    let modelo = (model || '').trim().replace(/^models\//, '');
-    if (modelo.includes('2.5')) modelo = 'gemini-1.5-flash';
+    const modelo = (model || 'gemini-2.5-flash').trim().replace(/^models\//, '');
     const cuerpoGemini = {
       systemInstruction: { parts: [{ text: sistema }] },
       contents: mensajes.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
