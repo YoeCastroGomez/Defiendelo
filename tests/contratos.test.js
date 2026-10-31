@@ -63,7 +63,7 @@ function simularIA(respuestas) {
     prompts.push(JSON.parse(opciones.body).systemInstruction.parts[0].text);
     const r = respuestas.shift();
     if (r.error) return new Response(r.error, { status: r.status });
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: r.texto }] } }] }), { status: 200 });
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: r.texto }] }, finishReason: r.finish || 'STOP' }] }), { status: 200 });
   };
   return {
     prompts,
@@ -567,16 +567,41 @@ describe('/api/documentos', () => {
     assert.equal(texto.includes('error_de_carlos'), false);
   });
 
-  test('los criterios del profesor llegan a la IA y sus errores no llegan crudos al cliente', async () => {
+  test('si la IA falla dos veces, se usan las dudas de respaldo con un aviso, sin mostrar su error', async () => {
     const ia = simularIA([{ status: 500, error: 'SECRETO-DEL-PROVEEDOR' }, { status: 500, error: 'SECRETO-DEL-PROVEEDOR' }]);
     const original = console.error;
     console.error = () => {};
     const r = await llamar(apiDocumentos, { method: 'POST', body: { titulo: 'Informe', curso: 'Diseño', criterios: 'CRITERIO-DE-PRUEBA', texto: palabras(300) } });
     console.error = original;
     ia.restaurar();
-    assert.equal(r.status, 502);
+    assert.equal(r.status, 201);
+    assert.deepEqual([r.json.modoGeneracion, r.json.puntos], ['respaldo', 4]);
+    assert.match(r.json.aviso, /dudas básicas/);
     assert.equal(JSON.stringify(r.json).includes('SECRETO'), false);
     assert.match(ia.prompts[0], /CRITERIO-DE-PRUEBA/);
+  });
+
+  test('una respuesta cortada por el límite de tokens se reintenta pidiendo brevedad', async () => {
+    const puntos = JSON.stringify({ titulo: 'T', puntos: [1, 2, 3, 4].map((k) => ({ tema: 'Tema ' + k, apertura: 'Oye ' + k, fragmento: 'f' + k })) });
+    const ia = simularIA([{ texto: '{"puntos":[{"tema":"cort', finish: 'MAX_TOKENS' }, { texto: puntos }]);
+    const original = console.error;
+    console.error = () => {};
+    const r = await llamar(apiDocumentos, { method: 'POST', body: { titulo: 'I', curso: 'C', texto: palabras(300) } });
+    console.error = original;
+    ia.restaurar();
+    assert.equal(r.json.modoGeneracion, 'ia');
+    assert.match(ia.prompts[1], /se cortó por largo/);
+  });
+
+  test('el documento común del profesor usa un prompt de comprensión, no el de "un estudiante subió su trabajo"', async () => {
+    const ia = simularIA([{ status: 500, error: 'x' }, { status: 500, error: 'x' }]);
+    const original = console.error;
+    console.error = () => {};
+    await llamar(apiDocumentos, { method: 'POST', body: { comun: true, titulo: 'Lectura', curso: 'Filosofía', texto: palabras(300) } });
+    console.error = original;
+    ia.restaurar();
+    assert.match(ia.prompts[0], /dejó a toda la clase este documento/);
+    assert.equal(ia.prompts[0].includes('Un estudiante subió su trabajo'), false);
   });
 
   test('el enunciado del profesor llega al estudiante y a la IA', async () => {
@@ -822,6 +847,29 @@ describe('/api/sesiones: lo que ve el profesor', () => {
     const r = await llamar(apiSesiones, { query: { codigo: 'DEMO-01' }, headers: { 'x-token-profesor': TOKEN_DEMO } });
     const guardada = r.json.sesiones.find((s) => s.nombre === 'Sucia');
     assert.deepEqual([guardada.senales.pantallaOculta, guardada.senales.pegadoBloqueado, guardada.senales.captura], [0, 999, 0]);
+  });
+});
+
+describe('compartido/llm.js: pensamiento de Gemini', () => {
+  let original;
+  afterEach(() => {
+    globalThis.fetch = original;
+    for (const v of ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL']) delete process.env[v];
+  });
+
+  test('desactiva el pensamiento en los alias -latest y reintenta sin él si el modelo no lo admite', async () => {
+    const { llamarLLM } = await import('../compartido/llm.js');
+    original = globalThis.fetch;
+    Object.assign(process.env, { LLM_PROVIDER: 'gemini', LLM_API_KEY: 'k', LLM_MODEL: 'gemini-flash-lite-latest' });
+    const cuerpos = [];
+    globalThis.fetch = async (_u, o) => {
+      cuerpos.push(JSON.parse(o.body));
+      if (cuerpos.length === 1) return new Response('Thinking is not supported for this model', { status: 400 });
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{}' }] }, finishReason: 'STOP' }] }), { status: 200 });
+    };
+    assert.equal(await llamarLLM('s', [{ role: 'user', content: 'x' }]), '{}');
+    assert.deepEqual(cuerpos[0].generationConfig.thinkingConfig, { thinkingBudget: 0 });
+    assert.equal(cuerpos[1].generationConfig.thinkingConfig, undefined);
   });
 });
 

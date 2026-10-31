@@ -32,6 +32,8 @@ export default async function handler(req, res) {
       tarea: limpio(b.tarea, 120),
       criterios: limpio(b.criterios, 600),
       estudiante: limpio(b.estudiante, 80),
+      // Documento que el profesor deja a toda la clase (no la resolución de un estudiante).
+      comun: b.comun === true && !b.codigo,
       evitar: [],
       universidadId: 'demo',
     };
@@ -64,6 +66,8 @@ export default async function handler(req, res) {
           fragmentos: caso.documento.fragmentos.length,
           puntos: caso.puntos.length,
           modoGeneracion: caso.modoGeneracion,
+          // Si la IA no logró preparar las dudas, se usaron las de respaldo: se avisa para poder reintentar.
+          ...(caso.modoGeneracion === 'respaldo' ? { aviso: 'La IA no respondió bien esta vez, así que Carlos preparó dudas básicas a partir del texto. Puedes volver a subir el documento para intentarlo de nuevo.' } : {}),
           persistente: persistente(),
         });
       }
