@@ -135,6 +135,57 @@ function detenerTemporizadorRespuesta(iniciado) {
   }
 }
 
+// Normalización fonética para el sintetizador de voz:
+// Convierte siglas técnicas en fonemas continuos para que la voz las pronuncie como palabras naturales
+// (ej. "vilan" en vez de deletrear "u-ve-e-le-a-e-ne"). En pantalla el texto escrito se mantiene intacto.
+const DICCIONARIO_FONETICO = [
+  [/\bVLANs\b/gi, 'vilans'],
+  [/\bVLAN\b/gi, 'vilan'],
+  [/\bWLANs\b/gi, 'güilans'],
+  [/\bWLAN\b/gi, 'güilán'],
+  [/\bIPs\b/gi, 'ipes'],
+  [/\bIP\b/gi, 'ipe'],
+  [/\bVPNs\b/gi, 'vepeenes'],
+  [/\bVPN\b/gi, 'vepeene'],
+  [/\bJSON\b/gi, 'yeison'],
+  [/\bAPIs\b/gi, 'apis'],
+  [/\bAPI\b/gi, 'api'],
+  [/\bSQL\b/gi, 'secuel'],
+  [/\bCPU\b/gi, 'cepeú'],
+  [/\bRAM\b/gi, 'ram'],
+  [/\bDNS\b/gi, 'de-ene-ese'],
+  [/\bDHCP\b/gi, 'de-hache-ce-pe'],
+  [/\bHTTP\b/gi, 'hache-te-te-pe'],
+  [/\bHTTPS\b/gi, 'hache-te-te-pe-ese'],
+  [/\bSSH\b/gi, 'ese-ese-hache'],
+  [/\bNAT\b/gi, 'nat'],
+  [/\bDMZ\b/gi, 'de-eme-zeta'],
+  [/\bOSPF\b/gi, 'o-ese-pe-efe'],
+  [/\bBGP\b/gi, 'be-ge-pe'],
+];
+
+function fonetizarParaVoz(t) {
+  let res = String(t || '');
+  for (const [re, fonema] of DICCIONARIO_FONETICO) {
+    res = res.replace(re, fonema);
+  }
+  return res;
+}
+
+function buscarMejorVozEspanol() {
+  if (!('speechSynthesis' in window)) return null;
+  const voces = speechSynthesis.getVoices();
+  if (!voces.length) return null;
+  // 1. Preferir voz de Perú si el navegador la tiene disponible
+  const pe = voces.find((v) => /es[-_]PE/i.test(v.lang));
+  if (pe) return pe;
+  // 2. Preferir voces latinoamericanas (evita que la 'V' se pronuncie como 'uve' en voces de España)
+  const latam = voces.find((v) => /es[-_](419|mx|us|co|cl|ar)/i.test(v.lang));
+  if (latam) return latam;
+  // 3. Cualquier otra voz en español
+  return voces.find((v) => v.lang && v.lang.toLowerCase().startsWith('es')) || null;
+}
+
 function hablar(texto, esPregunta = false) {
   $('av-carlos')?.classList.remove('hablando');
   if (!$('c-voz').checked || !('speechSynthesis' in window)) {
@@ -142,10 +193,14 @@ function hablar(texto, esPregunta = false) {
     return;
   }
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(texto);
+  const textoVoz = fonetizarParaVoz(texto);
+  const u = new SpeechSynthesisUtterance(textoVoz);
   u.lang = 'es-PE';
-  const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.toLowerCase().startsWith('es'));
-  if (v) u.voice = v;
+  const v = buscarMejorVozEspanol();
+  if (v) {
+    u.voice = v;
+    if (v.lang) u.lang = v.lang;
+  }
   u.rate = 1.10;
   let arrancado = false;
   const alTerminarHablar = () => {
