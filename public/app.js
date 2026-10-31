@@ -30,7 +30,7 @@ function tipoPunto(p) {
   return 'decision';
 }
 const HUMOR_TXT = {
-  curioso: 'compañero curioso',
+  curioso: 'estudiante curioso',
   confundido: 'dudando de su teoría',
   ironico: 'modo escéptico',
   convencido: 'convencido por ti',
