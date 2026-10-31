@@ -121,16 +121,17 @@ export async function evaluarTurno({ casoId, puntoId, historial, yaRepregunto, i
   let hist = recibido;
   let repregunto = !!yaRepregunto;
   if (intento) {
+    if (await entregaDelIntento(intento)) throw errorHttp('Esta entrega ya se cerró.', 409);
+    if (!(await esIntentoVigente(intento))) throw errorHttp('Este intento ya no es válido: se empezó otra entrega con ese nombre.', 409);
     const previos = await turnosDelPunto(intento, punto.id);
     // Si el punto ya se cerró (por ejemplo, se perdió la respuesta y el navegador reintenta), se devuelve
     // lo registrado: repetir la pregunta no da otra oportunidad.
-    if (await entregaDelIntento(intento)) throw errorHttp('Esta entrega ya se cerró.', 409);
-    if (!(await esIntentoVigente(intento))) throw errorHttp('Este intento ya no es válido: se empezó otra entrega con ese nombre.', 409);
     const cerrado = previos.find((t) => t.final);
     if (cerrado) return { ...resultadoRegistrado(cerrado), repetido: true };
     hist = historialRegistrado(punto, previos, respuesta);
-    repregunto = previos.length > 0;
-    await reservarTurno(intento, punto.id);
+    // El contador atómico dice qué turno es este. Si dos respuestas llegan a la vez, la segunda cuenta
+    // como respuesta a la repregunta aunque todavía no se vea registrada la primera.
+    repregunto = (await reservarTurno(intento, punto.id)) > 1;
   }
 
   // Las señales se recalculan aquí: las que mande el navegador no cuentan.
@@ -143,6 +144,9 @@ export async function evaluarTurno({ casoId, puntoId, historial, yaRepregunto, i
   const iaCaida = origen === 'simulado' && proveedorConfigurado();
 
   if (intento) {
+    // Con dos respuestas simultáneas, la que termine segunda no deja otro registro final.
+    const yaCerrado = (await turnosDelPunto(intento, punto.id)).find((t) => t.final);
+    if (yaCerrado) return { ...resultadoRegistrado(yaCerrado), repetido: true };
     await registrarEvaluacion(intento, punto.id, {
       final: !r.repreguntar, nivel: r.nivel, motivo: r.motivo, evidencia: r.evidencia,
       respuesta, carlos_dice: r.carlos_dice, leyo, dubitativo, origen, iaCaida,

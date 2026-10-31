@@ -42,13 +42,16 @@ function resultadosRegistrados(caso, finales) {
     const conversacion = [{ rol: 'carlos', texto: p.apertura }];
     reg.turnos.forEach((t, k) => {
       conversacion.push({ rol: 'estudiante', texto: t.respuesta });
-      if (k < reg.turnos.length - 1) conversacion.push({ rol: 'carlos', texto: t.carlos_dice });
+      // La última intervención de Carlos solo se muestra si quedó una repregunta sin responder.
+      if (k < reg.turnos.length - 1 || reg.pendiente) conversacion.push({ rol: 'carlos', texto: t.carlos_dice });
     });
     const f = reg.final;
     resultados[p.id] = {
-      tema: p.tema, tipo, nivel: f.nivel, motivo: f.motivo, evidencia: f.evidencia,
+      tema: p.tema, tipo, nivel: f.nivel,
+      motivo: reg.pendiente ? `${f.motivo} (Carlos le repreguntó y no alcanzó a responder.)`.trim() : f.motivo,
+      evidencia: f.evidencia,
       leyo: reg.turnos.some((t) => t.leyo), dubitativo: reg.turnos.some((t) => t.dubitativo),
-      origen: f.origen, conversacion,
+      origen: f.origen, ...(reg.pendiente ? { pendiente: true } : {}), conversacion,
     };
   }
   return resultados;
@@ -110,9 +113,11 @@ async function cerrarIntento(intento, { senales: senalesRaw, abandonada = false 
 
   const caso = await cargarCaso(intento.casoId);
   const finales = await evaluacionesFinales(intento);
-  if (!finales.size) throw errorHttp('La sesión debe contener al menos un punto evaluado', 400);
+  if (!finales.size) throw errorHttp('La sesión debe contener al menos un punto respondido', 400);
   const resultados = resultadosRegistrados(caso, finales);
-  const senales = senalesDeSesion(senalesRaw, resultados, finales, abandonada);
+  // "Abandonada" es salir con puntos sin responder. Si respondió todo y solo falló el envío final, no lo es.
+  const completa = caso.puntos.every((p) => finales.has(p.id) && !finales.get(p.id).pendiente);
+  const senales = senalesDeSesion(senalesRaw, resultados, finales, abandonada && !completa);
   const nivelGeneral = calcularNivelGeneral(resultados);
 
   // La duración va de que el servidor abrió el intento a la última respuesta registrada.

@@ -845,6 +845,43 @@ describe('un solo intento por estudiante', () => {
     assert.deepEqual(sesiones.map((x) => [x.nombre, x.senales.abandonada]), [['Dani', true]]);
   });
 
+  test('salir mientras Carlos repregunta no bloquea al estudiante: se entrega el punto como pendiente', async () => {
+    const repregunta = JSON.stringify({ nivel: 'amarillo', motivo: 'Idea parcial.', evidencia: 'x', repreguntar: true, carlos_dice: '¿Y eso por qué?' });
+    const ia = simularIA([{ texto: repregunta }]);
+    const t = await nuevaTarea();
+    const a = (await abrirIntento(t.codigo, 'Gabi')).json.intento;
+    assert.equal((await responder(a, 'p1', 'Una idea a medias.')).json.repreguntar, true);
+    ia.restaurar();
+    const otra = await abrirIntento(t.codigo, 'Gabi');
+    assert.equal(otra.status, 409, JSON.stringify(otra.json));
+    const [ses] = await panel(t);
+    assert.deepEqual([ses.resultados.p1.nivel, ses.resultados.p1.pendiente], ['amarillo', true]);
+    assert.match(ses.resultados.p1.motivo, /no alcanzó a responder/);
+    assert.deepEqual(ses.resultados.p1.conversacion.map((m) => m.rol), ['carlos', 'estudiante', 'carlos']);
+    assert.equal(ses.senales.abandonada, true);
+  });
+
+  test('si respondió todo y solo falló el envío final, al volver no se marca como abandonada', async () => {
+    const t = await nuevaTarea();
+    const a = (await abrirIntento(t.codigo, 'Hugo')).json.intento;
+    for (const pid of ['p1', 'p2', 'p3', 'p4']) await responder(a, pid, 'No sé.');
+    assert.equal((await abrirIntento(t.codigo, 'Hugo')).status, 409);
+    const [ses] = await panel(t);
+    assert.deepEqual([ses.senales.abandonada, ses.senales.sinRegistro], [false, 0]);
+  });
+
+  test('el número de turno lo da el contador atómico: una respuesta que llega segunda cuenta como la de la repregunta', async () => {
+    const t = await nuevaTarea();
+    const a = (await abrirIntento(t.codigo, 'Iris')).json.intento;
+    await almacen.incrementar(`turnos:${a}:p1`, 60); // otra petición simultánea ya reservó el primer turno
+    const repregunta = JSON.stringify({ nivel: 'amarillo', motivo: 'm', evidencia: 'e', repreguntar: true, carlos_dice: '¿Y?' });
+    const ia = simularIA([{ texto: repregunta }]);
+    const r = await responder(a, 'p1', 'Mi respuesta.');
+    ia.restaurar();
+    assert.equal(r.json.repreguntar, false, 'el segundo turno siempre cierra el punto');
+    assert.match(ia.prompts[0], /Ya repreguntaste/);
+  });
+
   test('dos cierres simultáneos del mismo intento guardan una sola entrega', async () => {
     const t = await nuevaTarea();
     const a = (await abrirIntento(t.codigo, 'Fer')).json.intento;
