@@ -151,14 +151,14 @@
 
     const ocupado = (si) => { [zona, abrirPegado, usar, area].forEach((b) => { b.disabled = si; }); };
 
-    async function ejecutar(obtenerTexto, titulo) {
+    async function ejecutar(obtenerTexto, titulo, archivo) {
       error.textContent = '';
       ocupado(true);
       try {
         const texto = await obtenerTexto();
         const mal = validarPalabras(texto, minimo, maximo);
         if (mal) throw new Error(mal);
-        await procesar(texto, titulo, (m) => { estado.textContent = m; });
+        await procesar(texto, titulo, (m) => { estado.textContent = m; }, archivo);
       } catch (e) {
         estado.textContent = '';
         error.textContent = e.message;
@@ -176,7 +176,7 @@
       ejecutar(() => {
         estado.textContent = '1/2 Leyendo archivo en tu navegador…';
         return extraerTexto(archivo);
-      }, tituloDeArchivo(archivo.name));
+      }, tituloDeArchivo(archivo.name), archivo);
     }
 
     zona.onclick = () => input.click();
@@ -195,6 +195,31 @@
     return {
       listo(mensaje) { estado.textContent = mensaje; zona.classList.add('oculto'); abrirPegado.classList.add('oculto'); cajaPegado.classList.add('oculto'); },
     };
+  }
+
+  // Guardar el original es un extra: si falla, la defensa sigue con el texto ya extraído.
+  async function guardarOriginal(archivo, tipo) {
+    if (!archivo) return null;
+    try {
+      const r = await fetch('api/archivos', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tipo, nombre: archivo.name, tamano: archivo.size }),
+      });
+      if (!r.ok) throw new Error('sin enlace de subida');
+      const d = await r.json();
+      const pdf = /\.pdf$/i.test(archivo.name);
+      const subida = await fetch(d.subirUrl, {
+        method: 'PUT',
+        headers: { 'content-type': pdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+        body: archivo,
+      });
+      if (!subida.ok) throw new Error('subida rechazada');
+      return { ruta: d.ruta, nombre: archivo.name };
+    } catch (e) {
+      console.warn('[subir] no se guardó el original:', e.message);
+      return null;
+    }
   }
 
   async function crearDocumento(datos) {
@@ -217,14 +242,31 @@
     chip.textContent = entrega ? 'pendiente' : 'listo';
     chip.classList.toggle('ok', !entrega);
     $('b-empezar').disabled = entrega;
+    const bajar = $('b-bajar-enunciado');
+    bajar.classList.toggle('oculto', !ev.detail.enunciadoDescargable);
+    bajar.onclick = async () => {
+      bajar.disabled = true;
+      try {
+        const r = await fetch('api/archivos?codigo=' + encodeURIComponent(ev.detail.codigo));
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error);
+        location.href = d.url;
+      } catch {
+        bajar.textContent = 'No se pudo descargar. Intenta de nuevo.';
+      } finally {
+        bajar.disabled = false;
+      }
+    };
     if (!entrega) { caja.replaceChildren(); return; }
 
     const vista = crearCaja(caja, {
       etiqueta: 'Sube tu resolución',
-      async procesar(texto, titulo, avisar) {
+      async procesar(texto, titulo, avisar, archivo) {
+        avisar('Guardando tu archivo…');
+        const original = await guardarOriginal(archivo, 'resolucion');
         avisar('2/2 Carlos está revisando tu trabajo para preparar sus dudas…');
         const t = S.tarea;
-        const d = await crearDocumento({ codigo: t.codigo, titulo: titulo || t.titulo, curso: t.curso, tarea: t.titulo, criterios: t.criterios, estudiante: $('nombre').value.trim(), texto });
+        const d = await crearDocumento({ archivo: original, codigo: t.codigo, titulo: titulo || t.titulo, curso: t.curso, tarea: t.titulo, criterios: t.criterios, estudiante: $('nombre').value.trim(), texto });
         const r = await fetch('api/casos?id=' + encodeURIComponent(d.casoId));
         if (!r.ok) throw new Error('Tu trabajo se procesó, pero no se pudo cargar. Intenta de nuevo.');
         S.caso = await r.json();
@@ -240,7 +282,7 @@
 
   /* ---------- profesor: documento de la tarea ---------- */
   let enunciado = null;
-  window.enunciadoTarea = () => (enunciado ? { enunciado: enunciado.texto, enunciadoNombre: enunciado.nombre } : {});
+  window.enunciadoTarea = () => (enunciado ? { enunciado: enunciado.texto, enunciadoNombre: enunciado.nombre, enunciadoArchivo: enunciado.original } : {});
 
   function montarEnunciado() {
     enunciado = null;
@@ -249,8 +291,10 @@
       etiqueta: 'Sube el documento de la tarea',
       minimo: MIN_PALABRAS_ENUNCIADO,
       maximo: MAX_PALABRAS_ENUNCIADO,
-      async procesar(texto, titulo) {
-        enunciado = { texto, nombre: titulo || 'Enunciado' };
+      async procesar(texto, titulo, avisar, archivo) {
+        avisar('Guardando tu archivo…');
+        const original = await guardarOriginal(archivo, 'enunciado');
+        enunciado = { texto, nombre: titulo || 'Enunciado', original };
         vista.listo(`Listo: ${enunciado.nombre} (${contarPalabras(texto).toLocaleString('es-PE')} palabras).`);
         const quitar = document.createElement('button');
         quitar.type = 'button';
@@ -298,10 +342,12 @@
 
   const montarBase = () => crearCaja($('caja-base-prof'), {
     etiqueta: 'Sube el trabajo que defenderá la clase',
-    async procesar(texto, titulo, avisar) {
+    async procesar(texto, titulo, avisar, archivo) {
+      avisar('Guardando tu archivo…');
+      const original = await guardarOriginal(archivo, 'resolucion');
       avisar('2/2 Preparando las dudas de Carlos…');
       const tituloBase = titulo || $('t-titulo').value;
-      const d = await crearDocumento({ titulo: tituloBase, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
+      const d = await crearDocumento({ archivo: original, titulo: tituloBase, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
       selector.querySelector('option[value="subir"]').before(nuevaOpcion(d.casoId, 'Trabajo subido: ' + d.titulo));
       selector.value = d.casoId;
       actualizarOrigen();

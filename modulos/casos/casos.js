@@ -32,7 +32,7 @@ export async function listarCasosBase() {
 
 // Copia para el navegador: nunca incluye que_debe_explicar ni error_de_carlos.
 export async function obtenerCasoPublico(id) {
-  const { carlos, ...caso } = await cargarCaso(id);
+  const { carlos, archivo, ...caso } = await cargarCaso(id);
   return {
     ...caso,
     puntos: caso.puntos.map((p) => ({

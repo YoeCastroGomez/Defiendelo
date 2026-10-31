@@ -77,7 +77,8 @@ Capa 3 · Infraestructura (compartido/)
 | Componente | Tecnología | Decisión |
 |---|---|---|
 | Frontend | HTML, CSS y JavaScript sin frameworks | Carga instantánea y cero dependencias para una demo confiable. |
-| Subida de trabajos | PDF.js y Mammoth.js en el navegador | El texto se extrae en el cliente: el archivo original no se guarda ni pasa por el servidor. |
+| Subida de trabajos | PDF.js y Mammoth.js en el navegador | El texto se extrae en el cliente; el archivo no pasa por nuestro servidor. |
+| Archivos originales | Supabase Storage (bucket privado) | Subida y descarga directas con enlaces firmados de 5 minutos. Es opcional: sin configurarlo, la defensa funciona con el texto. |
 | Dictado | Web Speech API (`es-PE`) | Gratis y en el navegador; no se envía audio a nuestro servidor. |
 | Voz de Carlos | `speechSynthesis` del navegador | Sin costo; se puede apagar. |
 | Backend | Funciones serverless de Vercel sobre Node.js 18+ | Sin dependencias npm; la API key nunca llega al navegador. |
@@ -107,13 +108,14 @@ Una sola llamada por turno mantiene el costo en centavos por defensa.
 
 ### Estructura
 ```
-api/                  Entrada HTTP: carlos, casos, tareas, sesiones, documentos
+api/                  Entrada HTTP: carlos, casos, tareas, sesiones, documentos, archivos
 modulos/defensa/      Prompt de Carlos, evaluación del turno y reintento de JSON
 modulos/casos/        Carga y sanitización de casos; datos/ guarda los casos base
 modulos/tareas/       Códigos, tokenProfesor y tarea pública
 modulos/reportes/     Sesiones de evaluación y recálculo del nivel general
 modulos/documentos/   Fragmentación del trabajo y generación de los 4 puntos
-compartido/           almacen.js (Redis o memoria) y llm.js (proveedores de IA)
+modulos/archivos/     Quién puede subir y descargar cada archivo original
+compartido/           almacen.js (Redis o memoria), llm.js (proveedores de IA) y archivos.js (Supabase Storage)
 public/               Pantallas, estilos y lógica del navegador
 tests/                Pruebas de contratos con node:test
 server.js             Servidor local sin dependencias
@@ -155,7 +157,8 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 
 **Limitaciones actuales**
 - **Los PDF escaneados no se leen** porque no hay OCR: hace falta texto seleccionable o un `.docx`.
-- **No se guarda el archivo original**: se guarda su texto, así que no se conservan imágenes ni formato y no se puede descargar el archivo.
+- **Carlos solo lee el texto**: no ve imágenes ni diagramas. El original se puede descargar, pero la defensa se basa en el texto extraído.
+- **Los archivos originales no se borran solos**: a diferencia de los datos en Redis, no expiran a los 60 días.
 - **No hay cuentas**: cualquiera con el código entra a la tarea, y el estudiante se identifica solo con su nombre.
 - **El token del profesor se muestra una sola vez** y no se puede recuperar.
 - **El límite por IP puede afectar a una clase** que comparte la misma red.
@@ -197,6 +200,15 @@ Crea una base Redis gratuita en [Upstash](https://upstash.com) y agrega:
 | `UPSTASH_REDIS_REST_TOKEN` | Token REST |
 
 Sin estas variables, los datos se guardan en memoria.
+
+### Guardar los archivos originales (opcional)
+Crea un bucket privado en [Supabase](https://supabase.com) con límite de 10 MB y agrega:
+
+| Variable | Valor |
+|---|---|
+| `SUPABASE_URL` | URL del proyecto |
+| `SUPABASE_SERVICE_KEY` | Clave secreta del proyecto; nunca llega al navegador |
+| `SUPABASE_BUCKET` | Nombre del bucket |
 
 ### Desplegar en Vercel
 1. Importa el repositorio en Vercel (no necesita configuración de build).

@@ -3,6 +3,7 @@
 import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { guardar, leer, persistente } from '../../compartido/almacen.js';
 import { cargarCaso } from '../defensa/turno.js';
+import { limpiarArchivo } from '../../compartido/archivos.js';
 
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sin 0/O ni 1/I/L
 
@@ -69,6 +70,7 @@ export async function crearTarea(datos = {}) {
     criterios: limpio(datos.criterios, 600),
     enunciado: limpio(datos.enunciado, 40000),
     enunciadoNombre: limpio(datos.enunciadoNombre, 120),
+    enunciadoArchivo: limpiarArchivo(datos.enunciadoArchivo, 'enunciado'),
     cierre: limpio(datos.cierre, 40),
     casoId,
     tokenProfesor,
@@ -94,8 +96,8 @@ export async function obtenerTareaInterna(codigoRaw) {
 export async function obtenerTareaPublica(codigoRaw) {
   const t = await obtenerTareaInterna(codigoRaw);
   if (!t) return null;
-  const { tokenProfesor, ...publica } = t;
-  return publica;
+  const { tokenProfesor, enunciadoArchivo, ...publica } = t;
+  return { ...publica, enunciadoDescargable: !!enunciadoArchivo };
 }
 
 export function verificarTokenProfesor(tarea, tokenRecibido) {
