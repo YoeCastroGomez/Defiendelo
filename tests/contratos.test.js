@@ -285,6 +285,7 @@ describe('/api/documentos', () => {
     assert.equal(r.status, 201);
     assert.match(r.json.casoId, /^doc-[0-9a-f]{10}$/);
     assert.equal(r.json.puntos, 4);
+    assert.equal(r.json.modoGeneracion, 'simulado');
 
     const publico = await llamar(apiCasos, { query: { id: r.json.casoId } });
     assert.equal(publico.status, 200);
@@ -293,6 +294,18 @@ describe('/api/documentos', () => {
     const texto = JSON.stringify(publico.json);
     assert.equal(texto.includes('que_debe_explicar'), false);
     assert.equal(texto.includes('error_de_carlos'), false);
+  });
+
+  test('los criterios del profesor llegan a la IA y sus errores no llegan crudos al cliente', async () => {
+    const ia = simularIA([{ status: 500, error: 'SECRETO-DEL-PROVEEDOR' }, { status: 500, error: 'SECRETO-DEL-PROVEEDOR' }]);
+    const original = console.error;
+    console.error = () => {};
+    const r = await llamar(apiDocumentos, { method: 'POST', body: { titulo: 'Informe', curso: 'Diseño', criterios: 'CRITERIO-DE-PRUEBA', texto: palabras(300) } });
+    console.error = original;
+    ia.restaurar();
+    assert.equal(r.status, 502);
+    assert.equal(JSON.stringify(r.json).includes('SECRETO'), false);
+    assert.match(ia.prompts[0], /CRITERIO-DE-PRUEBA/);
   });
 
   test('una tarea puede usar como base el caso recién creado', async () => {
