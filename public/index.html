@@ -59,7 +59,7 @@
         <textarea id="t-crit" class="claro" rows="3" maxlength="600">Por qué se eligió Observer, cómo reduce el acoplamiento, en qué se diferencia de Strategy y cómo se extiende el diseño.</textarea></div>
       <div class="dos-col">
         <div class="pila-c"><label class="etq" for="t-caso">Trabajo base</label><select id="t-caso"></select>
-          <span class="chico suave">En esta versión, el trabajo viene de un caso preparado.</span></div>
+          <div id="caja-base-prof"></div></div>
         <div class="pila-c"><label class="etq" for="t-cierre">Cierre</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
       </div>
       <p class="error" id="tarea-err" role="alert"></p>
@@ -101,6 +101,7 @@
       <div class="fila entre"><p class="etq" style="margin:0">Trabajo</p><span class="mono chico suave">código <b id="i-codigo"></b></span></div>
       <div class="archivo"><span id="i-tarea"></span><span class="chip ok">listo</span></div>
       <p class="mono chico suave" id="i-prov"></p>
+      <div id="caja-entrega-est" class="oculto"></div>
       <div class="pila-c"><label class="etq" for="nombre" style="margin:0">Tu nombre</label><input id="nombre" type="text" autocomplete="name" maxlength="80"><p class="error" id="nombre-err" role="alert"></p></div>
 
       <fieldset>
@@ -303,5 +304,6 @@
 <div id="velo" aria-hidden="true">Vuelve a esta ventana para seguir con Carlos.</div>
 
 <script src="app.js"></script>
+<script src="js/subir.js"></script>
 </body>
 </html>
