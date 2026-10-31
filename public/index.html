@@ -122,7 +122,37 @@
       <div id="d-doc"></div>
     </article>
     <section class="carlos" aria-live="polite">
-      <div class="quien"><span class="av">C</span><span><b>Carlos</b> · <span id="d-punto"></span></span></div>
+      <div class="quien">
+        <div class="av-carlos" id="av-carlos" data-estado="curioso" aria-hidden="true">
+          <svg viewBox="0 0 44 44" width="44" height="44" fill="none">
+            <circle cx="22" cy="22" r="20" fill="#E9C64B"/>
+            <path class="ceja-izq" d="M12 15.5 Q15.5 13.5 18.5 15" stroke="#17181A" stroke-width="2.2" stroke-linecap="round"/>
+            <path class="ceja-der" d="M25.5 15 Q28.5 13.5 32 15.5" stroke="#17181A" stroke-width="2.2" stroke-linecap="round"/>
+            <circle class="ojo" cx="15.5" cy="19.5" r="2.1" fill="#17181A"/>
+            <circle class="ojo" cx="28.5" cy="19.5" r="2.1" fill="#17181A"/>
+            <path class="boca boca-curioso" d="M17 28.5 Q22 31.5 27 28.5" stroke="#17181A" stroke-width="2.3" stroke-linecap="round"/>
+            <path class="boca boca-confundido" d="M16.5 29.5 Q20 27 23.5 29.5 T28 28.5" stroke="#17181A" stroke-width="2.3" stroke-linecap="round"/>
+            <path class="boca boca-ironico" d="M16.5 29.5 Q23 30 28.5 26" stroke="#17181A" stroke-width="2.3" stroke-linecap="round"/>
+            <path class="boca boca-convencido" d="M15.5 27.5 Q22 34 28.5 27.5" stroke="#17181A" stroke-width="2.4" stroke-linecap="round"/>
+            <ellipse class="boca boca-pensando" cx="22" cy="29" rx="2.5" ry="2" fill="#17181A"/>
+          </svg>
+        </div>
+        <div class="quien-meta">
+          <div><b>Carlos</b> · <span id="d-punto"></span></div>
+          <span class="mono chico osc-suave" id="d-humor">compañero curioso</span>
+        </div>
+      </div>
+      <div class="termometro" id="termo-caja" aria-label="Nivel de convencimiento de Carlos">
+        <div class="fila entre mono chico">
+          <span class="osc-suave">convencimiento de Carlos</span>
+          <span id="termo-txt" class="termo-etq">0% · esperando tu explicación</span>
+        </div>
+        <div class="termo-barra"><div class="termo-relleno" id="termo-relleno" style="width:0%"></div></div>
+      </div>
+      <div class="cinta-condicion oculto" id="cinta-condicion" role="status">
+        <span class="cinta-marca mono">CAMBIO DE CONDICIÓN</span>
+        <p class="chico">Nuevo escenario sobre tu diseño: explica cómo se adapta tu arquitectura sin romper lo anterior.</p>
+      </div>
       <p class="dice" id="d-dice"></p>
       <div class="entrada">
         <label for="resp" class="etq-osc">Tu explicación</label>

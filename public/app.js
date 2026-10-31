@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 const S = {
   caso: null, modo: 'practica', iaOK: false, forzarSim: false,
   i: 0, hist: [], repregunto: false, resultados: {}, t0: 0,
-  senales: { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, captura: 0, iaCaida: false },
+  senales: { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false },
 };
 
 /* ---------- utilidades ---------- */
@@ -29,11 +29,56 @@ function contencion(resp, texto) {
 }
 const frag = (id) => S.caso.documento.fragmentos.find((f) => f.id === id);
 const punto = () => S.caso.puntos[S.i];
+function tipoPunto(p) {
+  if (!p) return 'decision';
+  if (p.tipo) return p.tipo;
+  if (/condici[oó]n|mañana|nuevo canal|cambio/i.test(p.tema || '') || /si mañana/i.test(p.apertura || '')) return 'condicion';
+  if (p.error_de_carlos) return 'trampa';
+  return 'decision';
+}
+function esDubitativo(texto) {
+  const limpio = (texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const m = limpio.match(/\b(creo que|me parece|tal vez|quizas|quiza|no estoy segur[oa]|supongo|a lo mejor|no se bien|diria que)\b/g);
+  return (m ? m.length : 0) >= 1;
+}
+const HUMOR_TXT = {
+  curioso: 'compañero curioso',
+  confundido: 'dudando de su teoría',
+  ironico: 'modo escéptico',
+  convencido: 'convencido por ti',
+  pensando: 'procesando tu idea…',
+};
+function fijarAvatar(estado) {
+  const e = HUMOR_TXT[estado] ? estado : 'curioso';
+  if ($('av-carlos')) $('av-carlos').dataset.estado = e;
+  if ($('d-humor')) $('d-humor').textContent = HUMOR_TXT[e];
+}
+function actualizarTermometro(ultimoNivel, enRepregunta) {
+  if (!S.caso || !$('termo-relleno')) return;
+  const total = S.caso.puntos.length || 1;
+  const peso = { verde: 1, amarillo: 0.45, rojo: 0 };
+  const suma = Object.values(S.resultados).reduce((acc, r) => acc + (peso[r.nivel] ?? 0), 0);
+  const pct = Math.min(100, Math.round((suma / total) * 100));
+  const barra = $('termo-relleno');
+  barra.style.width = pct + '%';
+  barra.className = 'termo-relleno' + (pct >= 70 ? ' verde' : ultimoNivel === 'rojo' ? ' rojo' : '');
+  let msg = 'esperando tu explicación';
+  if (enRepregunta) msg = 'sigue con dudas, aclárale el punto';
+  else if (ultimoNivel === 'verde') msg = 'lo convenciste con argumentos';
+  else if (ultimoNivel === 'amarillo') msg = 'quedó medio convencido';
+  else if (ultimoNivel === 'rojo') {
+    msg = 'no lograste convencerlo';
+    const caja = $('termo-caja');
+    if (caja) { caja.classList.remove('sacudir'); void caja.offsetWidth; caja.classList.add('sacudir'); }
+  }
+  $('termo-txt').textContent = `${pct}% · ${msg}`;
+}
 
 /* ---------- voz ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, grabando = false, base = '';
 function hablar(texto) {
+  $('av-carlos')?.classList.remove('hablando');
   if (!$('c-voz').checked || !('speechSynthesis' in window)) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(texto);
@@ -41,6 +86,9 @@ function hablar(texto) {
   const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.toLowerCase().startsWith('es'));
   if (v) u.voice = v;
   u.rate = 1.05;
+  u.onstart = () => $('av-carlos')?.classList.add('hablando');
+  u.onend = () => $('av-carlos')?.classList.remove('hablando');
+  u.onerror = () => $('av-carlos')?.classList.remove('hablando');
   speechSynthesis.speak(u);
 }
 function toggleMic() {
@@ -78,7 +126,19 @@ function pintarDoc(cont, opts) {
     if (el.tagName === 'BUTTON') { el.type = 'button'; el.onclick = () => enfocarPunto(pId.id); }
     el.className = 'frag' + (r ? ' ' + r.nivel : '') + (opts.senalado === f.id ? ' senalado' : '');
     el.id = (opts.pref || '') + f.id;
-    el.textContent = f.texto;
+    if (opts.senalado === f.id) {
+      const pAct = punto();
+      const tp = tipoPunto(pAct);
+      const nota = document.createElement('span');
+      nota.className = 'frag-nota mono';
+      nota.textContent = (tp === 'condicion' ? 'Cambio de condición · ' : tp === 'trampa' ? 'Hipótesis de Carlos · ' : 'Duda de Carlos · ') + (pAct ? pAct.tema : 'Sección señalada');
+      const cuerpo = document.createElement('span');
+      cuerpo.className = 'frag-texto';
+      cuerpo.textContent = f.texto;
+      el.append(nota, cuerpo);
+    } else {
+      el.textContent = f.texto;
+    }
     cont.appendChild(el);
   });
 }
@@ -176,13 +236,14 @@ function empezar() {
   $('nombre-err').textContent = '';
   S.modo = document.querySelector('input[name=modo]:checked').value;
   S.i = 0; S.resultados = {}; S.t0 = Date.now();
-  S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, captura: 0, iaCaida: false };
+  S.senales = { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false };
   $('marca-agua').textContent = `${S.nombre} · ${S.tarea.codigo}   `.repeat(120);
   $('d-modo').textContent = S.modo === 'practica' ? 'práctica' : 'evaluación';
   $('d-titulo').textContent = S.caso.documento.titulo;
   $('b-sim').classList.toggle('oculto', S.iaOK && !S.forzarSim && S.modo === 'evaluacion');
   $('b-mic').classList.toggle('oculto', !SR);
   if (!SR) $('d-aviso').textContent = 'Tu navegador no permite dictado: escribe tu respuesta (Chrome sí lo permite).';
+  actualizarTermometro(null, false);
   mostrar('defensa');
   abrirPunto();
 }
@@ -201,10 +262,13 @@ function progreso() {
 function decir(texto) { $('d-dice').classList.remove('pensando'); $('d-dice').textContent = texto; hablar(texto); }
 function abrirPunto() {
   const p = punto();
+  const tp = tipoPunto(p);
   S.hist = [{ rol: 'carlos', texto: p.apertura }];
   S.repregunto = false;
   $('d-punto').textContent = `punto ${S.i + 1} de ${S.caso.puntos.length}`;
   $('resp').value = ''; $('d-aviso').textContent = SR ? '' : $('d-aviso').textContent;
+  if ($('cinta-condicion')) $('cinta-condicion').classList.toggle('oculto', tp !== 'condicion');
+  fijarAvatar(tp === 'trampa' ? 'confundido' : 'curioso');
   modoRespuesta(true);
   pintarDoc($('d-doc'), { senalado: p.fragmento });
   progreso();
@@ -219,20 +283,32 @@ function modoRespuesta(on) {
 }
 
 const corta = (t) => (t.length > 150 ? t.slice(0, 150).replace(/\s+\S*$/, '') + '…' : t);
-function simulado(p, texto, leyo) {
-  const r = simuladoBase(p, texto, leyo);
+function simulado(p, texto, leyo, dubitativo) {
+  const r = simuladoBase(p, texto, leyo, dubitativo);
   r.evidencia = corta(r.evidencia);
   return r;
 }
-function simuladoBase(p, texto, leyo) {
+function simuladoBase(p, texto, leyo, dubitativo) {
   const s = p.simulado;
-  if (!texto.trim() || texto === 'No sé.') return { nivel: 'rojo', motivo: 'No dio una explicación para este punto.', evidencia: texto || '(sin respuesta)', repreguntar: false, carlos_dice: 'Ya, tranqui. Lo vemos después.' };
-  if (leyo) return { nivel: 'amarillo', motivo: 'Leyó su trabajo casi palabra por palabra, sin explicarlo.', evidencia: texto.slice(0, 120), repreguntar: false, carlos_dice: 'Eso es lo que dice tu informe, ¿pero me lo puedes explicar con tus palabras? Bueno, sigamos.' };
-  if (texto.trim() === s.respuesta) {
-    const reac = { verde: 'Ahhh, ya entendí. Gracias, causa.', amarillo: 'Mmm, más o menos lo entiendo… sigamos.', rojo: 'Ah ya, entonces sí era como yo decía.' };
-    return { nivel: s.nivel, motivo: s.motivo, evidencia: s.respuesta.slice(0, 120), repreguntar: false, carlos_dice: reac[s.nivel] };
+  if (!texto.trim() || texto === 'No sé.') return { nivel: 'rojo', estado_carlos: 'ironico', motivo: 'No dio una explicación para este punto.', evidencia: texto || '(sin respuesta)', repreguntar: false, carlos_dice: 'Asu, si tú que hiciste el informe no sabes, mañana en la sustentación nos comen vivos. Sigamos.' };
+  if (leyo) return { nivel: 'amarillo', estado_carlos: 'ironico', motivo: 'Leyó su trabajo casi palabra por palabra, sin explicarlo.', evidencia: texto.slice(0, 120), repreguntar: false, carlos_dice: 'Ya, bacán, me leíste el párrafo igualito… pero yo quería que me lo traduzcas en cristiano. Sigamos.' };
+  if (s && texto.trim() === s.respuesta) {
+    const reac = {
+      verde: 'Manya, ahora sí tiene todo el sentido. Me dejaste sin argumentos, buena.',
+      amarillo: dubitativo ? '¿"Creo"? Con ese "creo" el profe nos baja puntos ah… más o menos te capto, sigamos.' : 'Mmm, más o menos te capto la idea, aunque me queda una duda… sigamos.',
+      rojo: '¿Ves? Entonces sí era como yo decía… aunque suena medio peligroso dejarlo así.',
+    };
+    const est = { verde: 'convencido', amarillo: 'confundido', rojo: 'ironico' };
+    return { nivel: s.nivel, estado_carlos: est[s.nivel], motivo: s.motivo, evidencia: s.respuesta.slice(0, 120), repreguntar: false, carlos_dice: reac[s.nivel] };
   }
-  return { nivel: 'amarillo', motivo: 'Modo simulado: respuesta libre sin evaluación de IA.', evidencia: texto.slice(0, 120), repreguntar: false, carlos_dice: 'Ya, creo que te entiendo. Sigamos.' };
+  return {
+    nivel: 'amarillo',
+    estado_carlos: dubitativo ? 'ironico' : 'confundido',
+    motivo: 'Modo simulado: respuesta libre sin evaluación de IA.',
+    evidencia: texto.slice(0, 120),
+    repreguntar: false,
+    carlos_dice: dubitativo ? 'Te noto dudando con ese "creo"… igual capto por dónde vas. Sigamos.' : 'Ya, creo que te capto la idea general. Sigamos con el otro punto.',
+  };
 }
 
 async function responder(texto) {
@@ -240,9 +316,12 @@ async function responder(texto) {
   if (grabando) rec.stop();
   const p = punto();
   const leyo = contencion(texto, frag(p.fragmento).texto) >= 0.6;
+  const dubitativo = esDubitativo(texto);
   if (leyo) S.senales.leyo++;
+  if (dubitativo) S.senales.dubitativo++;
   S.hist.push({ rol: 'estudiante', texto: texto || '(silencio)' });
   modoRespuesta(false); $('b-sig').classList.add('oculto');
+  fijarAvatar('pensando');
   $('d-dice').classList.add('pensando'); $('d-dice').textContent = 'Carlos está pensando…';
 
   let r;
@@ -250,28 +329,33 @@ async function responder(texto) {
     try {
       const res = await fetch('api/carlos', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ casoId: S.casoId, puntoId: p.id, historial: S.hist, yaRepregunto: S.repregunto, leyo }),
+        body: JSON.stringify({ casoId: S.casoId, puntoId: p.id, historial: S.hist, yaRepregunto: S.repregunto, leyo, dubitativo }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       r = await res.json();
     } catch (e) {
       S.senales.iaCaida = true; S.forzarSim = true;
       $('d-aviso').textContent = 'La IA no respondió; seguimos en modo simulado.';
-      r = simulado(p, texto, leyo);
+      r = simulado(p, texto, leyo, dubitativo);
     }
   } else {
-    r = simulado(p, texto, leyo);
+    r = simulado(p, texto, leyo, dubitativo);
   }
+
+  const estadoSugerido = r.estado_carlos || (r.repreguntar ? (dubitativo || leyo ? 'ironico' : 'confundido') : r.nivel === 'verde' ? 'convencido' : r.nivel === 'rojo' ? 'ironico' : 'confundido');
+  fijarAvatar(estadoSugerido);
 
   if (r.repreguntar && !S.repregunto) {
     S.repregunto = true;
     S.hist.push({ rol: 'carlos', texto: r.carlos_dice });
     $('resp').value = '';
+    actualizarTermometro(r.nivel, true);
     modoRespuesta(true);
     decir(r.carlos_dice);
     return;
   }
-  S.resultados[p.id] = { nivel: r.nivel, motivo: r.motivo, evidencia: r.evidencia, leyo, conversacion: S.hist.slice() };
+  S.resultados[p.id] = { tema: p.tema, tipo: tipoPunto(p), nivel: r.nivel, motivo: r.motivo, evidencia: r.evidencia, leyo, dubitativo, conversacion: S.hist.slice() };
+  actualizarTermometro(r.nivel, false);
   pintarDoc($('d-doc'), {});
   progreso();
   decir(r.carlos_dice);
@@ -314,6 +398,7 @@ function reporte() {
 
   const sen = [];
   if (S.senales.leyo) sen.push(`${S.senales.leyo} respuesta(s) casi idénticas al texto del trabajo.`);
+  if (S.senales.dubitativo) sen.push(`${S.senales.dubitativo} respuesta(s) con lenguaje dubitativo ("creo que", "tal vez").`);
   if (S.senales.pantallaOculta) sen.push(`Salió de la pestaña ${S.senales.pantallaOculta} vez/veces.`);
   if (S.senales.pegadoBloqueado) sen.push(`Intentó pegar texto ${S.senales.pegadoBloqueado} vez/veces.`);
   if (S.senales.captura) sen.push(`Intentó capturar o imprimir la pantalla ${S.senales.captura} vez/veces.`);
@@ -359,7 +444,7 @@ $('b-empezar').onclick = empezar;
 $('b-mic').onclick = toggleMic;
 $('b-enviar').onclick = () => responder($('resp').value);
 $('b-nose').onclick = () => responder('No sé.');
-$('b-sim').onclick = () => { $('resp').value = punto().simulado.respuesta; };
+$('b-sim').onclick = () => { $('resp').value = punto()?.simulado?.respuesta || `Explicación con mis propias palabras sobre ${punto()?.tema || 'este punto'} justificando la decisión del diseño.`; };
 $('b-sig').onclick = siguiente;
 $('resp').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) responder($('resp').value); });
 $('resp').addEventListener('paste', (e) => {

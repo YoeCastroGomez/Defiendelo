@@ -23,6 +23,7 @@
   "puntos": [
     {
       "id": "p1",
+      "tipo": "decision",
       "tema": "Por qué Observer",
       "fragmento": "f6",
       "apertura": "Oye, una duda. ¿Por qué tanto lío con observadores? ¿No era más fácil que Reserva llame directo a EmailService y listo?",
@@ -36,6 +37,7 @@
     },
     {
       "id": "p2",
+      "tipo": "trampa",
       "tema": "Acoplamiento del sujeto",
       "fragmento": "f4",
       "apertura": "Ah, ya. Entonces Reserva tiene que conocer a NotificadorCorreo, AvisoEncargado y Auditoria para poder llamarlos, ¿no?",
@@ -49,6 +51,7 @@
     },
     {
       "id": "p3",
+      "tipo": "trampa",
       "tema": "Observer vs. Strategy",
       "fragmento": "f5",
       "apertura": "Ya veo. Y lo de Strategy en el correo es lo mismo que Observer, ¿no? Los dos usan una interfaz.",
@@ -62,6 +65,7 @@
     },
     {
       "id": "p4",
+      "tipo": "condicion",
       "tema": "Cambio de condición: nuevo canal",
       "fragmento": "f3",
       "apertura": "Oye, y si mañana el profe pide avisar también por WhatsApp, ¿igual hay que meterle mano a la clase Reserva?",
