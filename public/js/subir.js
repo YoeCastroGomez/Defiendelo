@@ -463,6 +463,7 @@
   function fijarMinimo() { $('t-fecha').min = aLocal(new Date()); }
   document.querySelectorAll('input[name=t-tipo]').forEach((r) => r.addEventListener('change', () => {
     $('t-fecha-ayuda').textContent = AYUDA_FECHA[tipoActividad()] || '';
+    $('op-escrito').classList.toggle('oculto', tipoActividad() !== 'evaluacion');
   }));
   document.querySelectorAll('[data-plazo]').forEach((b) => {
     b.onclick = () => {
@@ -482,6 +483,6 @@
     if (!valor) throw new Error('Elige la fecha límite.');
     const fecha = new Date(valor); // se interpreta en la hora local del profesor
     if (!(fecha.getTime() > Date.now())) throw new Error('La fecha límite ya pasó: elige una fecha futura.');
-    return { tipoActividad: tipo, fechaLimite: fecha.toISOString() };
+    return { tipoActividad: tipo, fechaLimite: fecha.toISOString(), permitirEscrito: tipo === 'evaluacion' && $('t-escrito').checked };
   };
 })();

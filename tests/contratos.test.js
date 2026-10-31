@@ -5,7 +5,8 @@ import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 
 // Toda tarea nueva necesita tipo de actividad y fecha límite.
-const PLAZO = { tipoActividad: 'evaluacion', fechaLimite: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() };
+// Las pruebas responden por escrito; la regla de solo voz tiene sus propias pruebas.
+const PLAZO = { tipoActividad: 'evaluacion', permitirEscrito: true, fechaLimite: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() };
 import { existsSync, readFileSync } from 'node:fs';
 
 const VARIABLES = ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL', 'LLM_MODEL_RESPALDO', 'LLM_BASE_URL', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'DEMO_TOKEN_PROFESOR', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SUPABASE_BUCKET'];
@@ -405,6 +406,62 @@ describe('tipo de actividad y fecha límite', () => {
     const t = (await crear({})).json;
     await entregar(t.codigo, 'Puntual', { p1: 'No sé.' });
     assert.equal((await panel(t)).sesiones[0].senales.fueraDePlazo, false);
+  });
+});
+
+describe('rendir práctica (varias veces) y rendir evaluación (una vez, por voz)', () => {
+  const crear = (extra) => llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'demo', ...PLAZO, ...extra } });
+  const panel = async (t) => (await llamar(apiSesiones, { query: { codigo: t.codigo }, headers: { 'x-token-profesor': t.tokenProfesor } })).json;
+  const responderPor = (intento, via, texto = 'No sé.') => llamar(apiCarlos, { method: 'POST', body: { intento, puntoId: 'p1', via, historial: [{ rol: 'estudiante', texto }] } });
+
+  test('en una práctica se rinde varias veces y el profesor ve todos los intentos numerados', async () => {
+    const t = (await crear({ tipoActividad: 'practica' })).json;
+    for (let k = 0; k < 3; k++) assert.equal((await entregar(t.codigo, 'Ana', { p1: 'No sé.' })).cierre.status, 201);
+    await entregar(t.codigo, 'Beto', { p1: 'No sé.' });
+    const { sesiones } = await panel(t);
+    assert.deepEqual(sesiones.filter((s) => s.nombre === 'Ana').map((s) => s.numeroIntento).sort(), [1, 2, 3]);
+    assert.equal(sesiones.find((s) => s.nombre === 'Beto').numeroIntento, 1);
+  });
+
+  test('en una práctica, salir a mitad deja ese intento registrado y permite rendir otra vez', async () => {
+    const t = (await crear({ tipoActividad: 'practica' })).json;
+    const a = (await abrirIntento(t.codigo, 'Caro')).json.intento;
+    await responder(a, 'p1', 'No sé.');
+    const otra = await abrirIntento(t.codigo, 'Caro');
+    assert.equal(otra.status, 201);
+    const [ses] = (await panel(t)).sesiones;
+    assert.deepEqual([ses.senales.abandonada, ses.numeroIntento], [true, 1]);
+  });
+
+  test('en una evaluación solo se responde por voz: una respuesta escrita se rechaza', async () => {
+    const t = (await crear({ permitirEscrito: false })).json;
+    const a = (await abrirIntento(t.codigo, 'Dani')).json.intento;
+    const escrita = await responderPor(a, 'texto');
+    assert.equal(escrita.status, 400);
+    assert.match(escrita.json.error, /solo se responde por voz/);
+    assert.equal((await responderPor(a, 'voz')).status, 200);
+    assert.equal((await cerrarSesion(a)).status, 201);
+    assert.equal((await panel(t)).sesiones[0].resultados.p1.via, 'voz');
+  });
+
+  test('el botón "No sé" se acepta en una evaluación solo por voz', async () => {
+    const t = (await crear({ permitirEscrito: false })).json;
+    const a = (await abrirIntento(t.codigo, 'Eli')).json.intento;
+    assert.equal((await responderPor(a, 'boton')).status, 200);
+  });
+
+  test('con la casilla del profesor, la evaluación acepta respuestas escritas y queda marcado', async () => {
+    const t = (await crear({ permitirEscrito: true })).json;
+    assert.equal((await llamar(apiTareas, { query: { codigo: t.codigo } })).json.permitirEscrito, true);
+    const a = (await abrirIntento(t.codigo, 'Fer')).json.intento;
+    assert.equal((await responderPor(a, 'texto')).status, 200);
+    await cerrarSesion(a);
+    assert.equal((await panel(t)).sesiones[0].resultados.p1.via, 'texto');
+  });
+
+  test('la casilla de respuesta escrita no aplica a una práctica', async () => {
+    const t = (await crear({ tipoActividad: 'practica', permitirEscrito: true })).json;
+    assert.equal((await llamar(apiTareas, { query: { codigo: t.codigo } })).json.permitirEscrito, false);
   });
 });
 

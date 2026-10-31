@@ -3,7 +3,8 @@ import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 // Toda tarea nueva necesita tipo de actividad y fecha límite.
-const PLAZO = { tipoActividad: 'evaluacion', fechaLimite: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() };
+// Las pruebas responden por escrito; la regla de solo voz tiene sus propias pruebas.
+const PLAZO = { tipoActividad: 'evaluacion', permitirEscrito: true, fechaLimite: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString() };
 
 for (const v of ['LLM_PROVIDER', 'LLM_API_KEY', 'LLM_MODEL', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'SUPABASE_URL']) delete process.env[v];
 

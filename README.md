@@ -48,15 +48,20 @@ Defiéndelo convierte cada trabajo entregado en una conversación de unos 5 a 7 
 
 Los códigos usan un alfabeto sin caracteres confusos (sin `0/O` ni `1/I/L`) para que se puedan dictar en clase, y se aceptan en minúsculas o sin guion. El código `DEMO-01` siempre abre la tarea de demostración.
 
-### Dos pasos: ensayar y entregar
-| | Ensayar (opcional) | Entregar (la tarea) |
+### Rendir práctica o rendir evaluación
+El estudiante no elige entre ensayar y entregar: la tarea define cómo se rinde, según el tipo que eligió el profesor.
+
+| | Práctica | Evaluación calificada |
 |---|---|---|
-| Objetivo | Practicar antes de la entrega | Defensa registrada para el profesor |
+| Botón | *Rendir práctica* | *Rendir evaluación* |
 | Intentos | Los que quiera | Uno por estudiante |
-| Dudas de Carlos | Las primeras que prepara | Nuevas, si ya ensayó con ese archivo |
-| Quién ve el reporte | Solo el estudiante | El estudiante y el profesor |
-| Se guarda en el servidor | No | Sí: cada evaluación de Carlos queda registrada al momento |
-| Pegar texto | Permitido | Bloqueado (y se registra el intento) |
+| Cómo responde | Hablando o escribiendo | Solo hablando, salvo que el profesor marque *Permitir responder por escrito* |
+| Qué ve el profesor | Todos los intentos, numerados | La entrega única |
+| Fecha límite | De referencia: se puede rendir después, marcado *fuera de plazo* | Al vencer, ya no se puede empezar |
+| Salir a mitad | Lo respondido queda como un intento, y puede volver a rendir | Se entrega lo respondido |
+| Pegar texto | Bloqueado (se registra el intento) | Bloqueado (se registra el intento) |
+
+En una evaluación solo por voz, la transcripción no se puede editar y el servidor rechaza una respuesta que el navegador marque como escrita. Es una barrera para el uso normal, no una garantía frente a alguien que modifique la página. Si el navegador no permite dictado (solo funciona bien en Chrome y Edge), la app avisa antes de empezar. `DEMO-01` funciona como una práctica.
 
 El profesor siempre decide la nota. Defiéndelo solo **sugiere un nivel** y entrega la evidencia.
 
@@ -153,7 +158,7 @@ Una sola llamada por turno mantiene el costo en centavos por defensa.
 - **El nivel de cada punto lo decide el servidor**, no el navegador: el reporte se arma con las evaluaciones registradas en el intento (ver *Cómo se registra una entrega*). Mandar a mano un reporte todo en verde no sirve.
 - **Los trabajos subidos son privados.** `/api/documentos` devuelve una `llave`, y el trabajo solo se abre con ella (cabecera `x-llave-caso`). También lo abren quien tenga el código de una tarea que lo use como trabajo base, y el profesor, con su token, si su tarea recibió una entrega sobre él. Para crear una tarea sobre un trabajo subido también hace falta su llave. Conocer el id no basta.
 - Una entrega solo puede usar un trabajo subido **para esa misma tarea** y con su llave.
-- **El trabajo del estudiante entra a los prompts como datos.** Va entre marcas `<<<TRABAJO … TRABAJO>>>` (las marcas que traiga el propio texto se neutralizan) y la IA tiene orden de ignorar cualquier instrucción, "nota para el evaluador" o pauta escrita dentro de él, tanto al generar los puntos como al evaluar cada respuesta. Las dudas del ensayo que no deben repetirse las lee el servidor del caso anterior; el navegador no puede mandar texto propio al prompt. Sin IA, la respuesta de ejemplo de un trabajo subido no da verde, porque la generó la IA a partir de un texto del estudiante.
+- **El trabajo del estudiante entra a los prompts como datos.** Va entre marcas `<<<TRABAJO … TRABAJO>>>` (las marcas que traiga el propio texto se neutralizan) y la IA tiene orden de ignorar cualquier instrucción, "nota para el evaluador" o pauta escrita dentro de él, tanto al generar los puntos como al evaluar cada respuesta. Las dudas del intento anterior, que no deben repetirse, las lee el servidor del caso anterior; el navegador no puede mandar texto propio al prompt. Sin IA, la respuesta de ejemplo de un trabajo subido no da verde, porque la generó la IA a partir de un texto del estudiante.
 - **Límites por minuto, por IP y globales**, pensados para que un aula de unas 60 personas detrás de una sola IP funcione sin cortes:
 
   | Endpoint | Por IP | Global |
@@ -223,7 +228,7 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 - Panel del profesor con entregas, señales, conversación por punto y trabajo marcado.
 - Señales de sesión: respuestas leídas del trabajo, salidas de la pestaña, intentos de pegar y de captura.
 - Respaldo automático a modo simulado, en el servidor, si la IA falla en medio de la sesión.
-- El profesor puede **cerrar y reabrir** las entregas desde su panel. Cerrada, la tarea no acepta entregas nuevas; quien ya había empezado puede terminar y todos pueden seguir ensayando.
+- El profesor puede **cerrar y reabrir** las entregas desde su panel. Cerrada, la tarea no acepta entregas nuevas; quien ya había empezado puede terminar.
 - Mecánicas interactivas: avatar expresivo, termómetro de convencimiento, cinta de cambio de condición, detección de muletillas y anotación del fragmento en discusión.
 - Panel del profesor con resumen de la clase, lista escaneable por estudiante y detalle con el diálogo colapsado.
 - Pruebas automáticas de los contratos de la API, de la seguridad y del despliegue.
@@ -236,7 +241,7 @@ Si la IA no está configurada, la app funciona en **modo simulado**: el botón *
 - **Los archivos originales no se borran solos**: a diferencia de los datos en Redis, no expiran a los 60 días.
 - **No hay cuentas**: cualquiera con el código entra a la tarea, y el estudiante se identifica solo con su nombre. Por eso, el límite de una entrega se puede evadir escribiendo otro nombre, y el profesor no ve quién falta si no compara con su lista.
 - **Salir a mitad de una entrega sí gasta el intento**: se entrega lo respondido. Solo un intento sin ninguna respuesta se puede volver a empezar.
-- **Las dudas nuevas solo aplican a trabajos subidos por el estudiante**: en un trabajo base común, ensayo y entrega usan las mismas.
+- **Las dudas nuevas solo aplican a trabajos subidos por el estudiante**: en un documento común, cada intento de práctica usa las mismas dudas.
 - **La fecha límite se interpreta en la hora del navegador del profesor** y se muestra a cada estudiante en su propia hora local. Además de la fecha, el profesor puede cerrar o reabrir las entregas a mano desde su panel.
 - **Un punto evaluado sin conexión no cuenta**: si el navegador no logra hablar con el servidor, el punto queda en rojo y marcado como “sin registro” para que el profesor lo revise.
 - **El token del profesor se muestra una sola vez** y no se puede recuperar.

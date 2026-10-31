@@ -7,6 +7,10 @@ import { cargarCaso } from '../casos/casos.js';
 import { exigirAccesoCaso } from '../casos/acceso.js';
 import { leerIntento, turnosDelPunto, reservarTurno, registrarEvaluacion, esIntentoVigente, entregaDelIntento } from '../reportes/intentos.js';
 import { comoDatos, REGLA_DATOS } from './datos.js';
+import { obtenerTareaInterna, soloVoz } from '../tareas/tareas.js';
+
+// Cómo llegó la respuesta, según el navegador: dictada, escrita o con el botón "No sé".
+const VIAS = ['voz', 'texto', 'boton'];
 import { evaluacionSimulada } from './simulado.js';
 
 const { leyoTrabajo, esDubitativo } = globalThis.Senales;
@@ -108,7 +112,8 @@ const resultadoRegistrado = (t) => ({
 
 // historial: [{rol:'carlos'|'estudiante', texto}] solo del punto actual.
 // Con `intento` (entrega), el servidor guarda la evaluación; sin él (ensayo), solo responde.
-export async function evaluarTurno({ casoId, puntoId, historial, yaRepregunto, intento: intentoId, llave, codigo } = {}) {
+export async function evaluarTurno({ casoId, puntoId, historial, yaRepregunto, intento: intentoId, llave, codigo, via: viaRaw } = {}) {
+  const via = VIAS.includes(viaRaw) ? viaRaw : 'texto';
   const intento = intentoId ? await leerIntento(intentoId) : null;
   const caso = intento ? await cargarCaso(intento.casoId) : await exigirAccesoCaso(String(casoId || ''), { llave, codigo });
   const punto = caso.puntos.find((p) => p.id === puntoId);
@@ -122,6 +127,11 @@ export async function evaluarTurno({ casoId, puntoId, historial, yaRepregunto, i
   let repregunto = !!yaRepregunto;
   if (intento) {
     if (await entregaDelIntento(intento)) throw errorHttp('Esta entrega ya se cerró.', 409);
+    // En una evaluación solo por voz, una respuesta escrita se rechaza. El navegador es quien informa la vía:
+    // es una barrera para el uso normal, no una garantía frente a alguien que modifique la página.
+    if (via === 'texto' && soloVoz(await obtenerTareaInterna(intento.codigo))) {
+      throw errorHttp('En esta evaluación solo se responde por voz.', 400);
+    }
     if (!(await esIntentoVigente(intento))) throw errorHttp('Este intento ya no es válido: se empezó otra entrega con ese nombre.', 409);
     const previos = await turnosDelPunto(intento, punto.id);
     // Si el punto ya se cerró (por ejemplo, se perdió la respuesta y el navegador reintenta), se devuelve
@@ -149,7 +159,7 @@ export async function evaluarTurno({ casoId, puntoId, historial, yaRepregunto, i
     if (yaCerrado) return { ...resultadoRegistrado(yaCerrado), repetido: true };
     await registrarEvaluacion(intento, punto.id, {
       final: !r.repreguntar, nivel: r.nivel, motivo: r.motivo, evidencia: r.evidencia,
-      respuesta, carlos_dice: r.carlos_dice, leyo, dubitativo, origen, iaCaida,
+      respuesta, carlos_dice: r.carlos_dice, leyo, dubitativo, origen, iaCaida, via,
     });
   }
   return { ...r, leyo, dubitativo, simulado: origen === 'simulado', iaCaida };
