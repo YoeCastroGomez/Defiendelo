@@ -44,24 +44,26 @@
 <!-- ============ PROFESOR: CREAR TAREA ============ -->
 <section class="pantalla" id="profe">
   <header class="top">
-    <button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button>
+    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">← Volver</button></div>
     <span class="mono suave">profesor</span>
   </header>
   <main class="solo">
     <h1 class="titulo">Nueva defensa</h1>
     <form class="tarjeta pila" id="f-tarea">
       <div class="dos-col">
-        <div class="pila-c"><label class="etq" for="t-curso">Curso</label><input id="t-curso" type="text" value="Diseño de Software" required maxlength="80"></div>
+        <div class="pila-c"><label class="etq" for="t-curso">Curso</label><input id="t-curso" type="text" placeholder="p. ej. Diseño de Software" required maxlength="80"></div>
         <div class="pila-c"><label class="etq" for="t-prof">Profesor</label><input id="t-prof" type="text" placeholder="Tu nombre" maxlength="80"></div>
       </div>
-      <div class="pila-c"><label class="etq" for="t-titulo">Título de la tarea</label><input id="t-titulo" type="text" value="Informe de diseño: módulo de notificaciones" required maxlength="120"></div>
+      <div class="pila-c"><label class="etq" for="t-titulo">Título de la tarea</label><input id="t-titulo" type="text" placeholder="p. ej. Informe final de arquitectura" required maxlength="120"></div>
       <div class="pila-c"><label class="etq" for="t-crit">Qué deben poder explicar</label>
-        <textarea id="t-crit" class="claro" rows="3" maxlength="600">Por qué se eligió Observer, cómo reduce el acoplamiento, en qué se diferencia de Strategy y cómo se extiende el diseño.</textarea></div>
-      <div class="dos-col">
-        <div class="pila-c"><label class="etq" for="t-caso">Trabajo base</label><select id="t-caso"></select>
-          <div id="caja-base-prof"></div></div>
-        <div class="pila-c"><label class="etq" for="t-cierre">Cierre</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
-      </div>
+        <textarea id="t-crit" class="claro" rows="3" maxlength="600" placeholder="p. ej. Por qué eligieron esa arquitectura y cómo responde a un cambio de requisitos."></textarea></div>
+      <div class="pila-c"><span class="etq" style="margin:0">Documento de la tarea (opcional)</span>
+        <span class="chico suave">El enunciado que deben resolver. Tus estudiantes podrán leerlo y Carlos lo usará para preparar sus dudas.</span>
+        <div id="caja-enunciado"></div></div>
+      <div class="pila-c"><label class="etq" for="t-caso">Qué trabajo se defiende</label><select id="t-caso"></select>
+        <span class="chico suave" id="t-origen-ayuda"></span>
+        <div id="caja-base-prof" class="oculto"></div></div>
+      <div class="pila-c"><label class="etq" for="t-cierre">Cierre (opcional)</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
       <p class="error" id="tarea-err" role="alert"></p>
       <button class="btn" type="submit" id="b-crear">Generar código</button>
     </form>
@@ -88,7 +90,7 @@
 <!-- ============ ESTUDIANTE: TAREA ============ -->
 <section class="pantalla" id="inicio">
   <header class="top">
-    <button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button>
+    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">← Cambiar código</button></div>
     <span class="mono suave estado-ia">comprobando IA…</span>
   </header>
   <main class="inicio">
@@ -96,6 +98,7 @@
       <p class="mono suave" id="i-curso"></p>
       <h1 id="i-titulo"></h1>
       <div id="i-crit-caja" class="oculto"><p class="etq">Lo que tu profesor espera que puedas explicar</p><p class="lead" id="i-crit"></p></div>
+      <details id="i-enunciado-caja" class="enunciado oculto"><summary id="i-enunciado-nombre"></summary><div id="i-enunciado"></div></details>
     </div>
     <div class="tarjeta inicio-form">
       <div class="fila entre"><p class="etq" style="margin:0">Trabajo</p><span class="mono chico suave">código <b id="i-codigo"></b></span></div>
@@ -112,6 +115,14 @@
           <span><b>Evaluación</b><br><span class="suave">El reporte lo ve tu profesor. Pegar texto está desactivado.</span></span></label>
       </fieldset>
 
+      <fieldset>
+        <legend class="etq">Cómo vas a responder</legend>
+        <label class="opcion" id="op-voz"><input type="radio" name="respuesta" value="voz" checked>
+          <span><b>Hablando</b><br><span class="suave" id="op-voz-txt">Le explicas a Carlos en voz alta y ves lo que se transcribe.</span></span></label>
+        <label class="opcion"><input type="radio" name="respuesta" value="texto">
+          <span><b>Escribiendo</b><br><span class="suave">Le escribes tu explicación. Puedes cambiar durante la defensa.</span></span></label>
+      </fieldset>
+
       <p class="chico suave">Puedes haber usado IA para hacer tu trabajo; aquí importa que lo entiendas. Tu trabajo estará a la vista todo el tiempo.</p>
       <button class="btn" id="b-empezar" type="button">Empezar con Carlos</button>
     </div>
@@ -121,7 +132,7 @@
 <!-- ============ DEFENSA ============ -->
 <section class="pantalla" id="defensa">
   <header class="top">
-    <span class="marca">defiéndelo<span class="cur">_</span></span>
+    <div class="top-izq"><span class="marca">defiéndelo<span class="cur">_</span></span><button class="volver" type="button" id="b-salir">← Salir</button></div>
     <ol class="progreso" id="progreso" aria-label="Puntos"></ol>
     <span class="mono suave"><span id="d-modo"></span> · <span id="reloj">00:00</span></span>
   </header>
@@ -168,10 +179,11 @@
         <label for="resp" class="etq-osc">Tu explicación</label>
         <textarea id="resp" rows="5" placeholder="Habla o escribe con tus palabras…"></textarea>
         <p class="mono chico osc-suave" id="d-aviso"></p>
-        <div class="fila">
+        <div class="fila" id="d-controles">
           <button class="btn claro" id="b-mic" type="button">● Hablar</button>
           <button class="btn amarillo" id="b-enviar" type="button">Responder</button>
           <button class="btn fantasma" id="b-nose" type="button">No sé</button>
+          <button class="btn fantasma" id="b-cambiar" type="button">Prefiero escribir</button>
           <button class="btn fantasma" id="b-sim" type="button">Simular respuesta</button>
         </div>
         <button class="btn amarillo oculto" id="b-sig" type="button">Siguiente</button>
@@ -184,7 +196,7 @@
 <!-- ============ REPORTE ============ -->
 <section class="pantalla" id="reporte">
   <header class="top">
-    <span class="marca">defiéndelo<span class="cur">_</span></span>
+    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">← Inicio</button></div>
     <span class="mono suave" id="r-meta"></span>
   </header>
   <main class="reporte">
@@ -214,7 +226,7 @@
 <!-- ============ PROFESOR: PANEL DE REPORTES ============ -->
 <section class="pantalla" id="panel-profe">
   <header class="top">
-    <button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button>
+    <div class="top-izq"><button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button><button class="volver" type="button" data-ir="rol">← Volver</button></div>
     <div class="fila">
       <button class="btn claro" type="button" id="b-panel-nueva">Nueva tarea</button>
       <span class="mono suave">panel docente</span>

@@ -5,6 +5,8 @@
   const MAX_BYTES = 10 * 1024 * 1024;
   const MIN_PALABRAS = 50;
   const MAX_PALABRAS = 15000;
+  const MIN_PALABRAS_ENUNCIADO = 5;
+  const MAX_PALABRAS_ENUNCIADO = 5000;
   const CDN_PDF = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   const CDN_MAMMOTH = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js';
   const ACCEPT = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -86,15 +88,15 @@
     }
   }
 
-  function validarPalabras(texto) {
+  function validarPalabras(texto, minimo, maximo) {
     const n = contarPalabras(texto);
-    if (n < MIN_PALABRAS) return `Solo se leyeron ${n} palabras (mínimo ${MIN_PALABRAS}). Si es un PDF escaneado, sube un PDF con texto seleccionable o un archivo .docx.`;
-    if (n > MAX_PALABRAS) return `El trabajo tiene ${n} palabras y el máximo es 15 000. Sube solo la sección que vas a defender.`;
+    if (n < minimo) return `Solo se leyeron ${n} palabras (mínimo ${minimo}). Si es un PDF escaneado, sube un PDF con texto seleccionable o un archivo .docx.`;
+    if (n > maximo) return `El documento tiene ${n} palabras y el máximo es ${maximo.toLocaleString('es-PE')}. Sube solo la parte necesaria.`;
     return '';
   }
 
   // Dibuja la zona de subida. `procesar(texto, titulo, avisar)` hace lo que corresponda con el texto validado.
-  function crearCaja(contenedor, { etiqueta, procesar }) {
+  function crearCaja(contenedor, { etiqueta, procesar, minimo = MIN_PALABRAS, maximo = MAX_PALABRAS }) {
     contenedor.replaceChildren();
     const raiz = document.createElement('div');
     raiz.className = 'pila-c';
@@ -129,7 +131,7 @@
     pie.className = 'fila entre';
     const contador = document.createElement('span');
     contador.className = 'mono chico suave';
-    contador.textContent = '0 / 15 000 palabras';
+    contador.textContent = `0 / ${maximo.toLocaleString('es-PE')} palabras`;
     const usar = document.createElement('button');
     usar.type = 'button';
     usar.className = 'btn claro';
@@ -154,7 +156,7 @@
       ocupado(true);
       try {
         const texto = await obtenerTexto();
-        const mal = validarPalabras(texto);
+        const mal = validarPalabras(texto, minimo, maximo);
         if (mal) throw new Error(mal);
         await procesar(texto, titulo, (m) => { estado.textContent = m; });
       } catch (e) {
@@ -187,7 +189,7 @@
       if (!zona.disabled) elegir(e.dataTransfer.files[0]);
     };
     abrirPegado.onclick = () => { cajaPegado.classList.toggle('oculto'); if (!cajaPegado.classList.contains('oculto')) area.focus(); };
-    area.oninput = () => { contador.textContent = `${contarPalabras(area.value).toLocaleString('es-PE')} / 15 000 palabras`; };
+    area.oninput = () => { contador.textContent = `${contarPalabras(area.value).toLocaleString('es-PE')} / ${maximo.toLocaleString('es-PE')} palabras`; };
     usar.onclick = () => ejecutar(async () => area.value, '');
 
     return {
@@ -218,11 +220,11 @@
     if (!entrega) { caja.replaceChildren(); return; }
 
     const vista = crearCaja(caja, {
-      etiqueta: 'Sube tu trabajo',
+      etiqueta: 'Sube tu resolución',
       async procesar(texto, titulo, avisar) {
         avisar('2/2 Carlos está revisando tu trabajo para preparar sus dudas…');
         const t = S.tarea;
-        const d = await crearDocumento({ titulo: titulo || t.titulo, curso: t.curso, tarea: t.titulo, criterios: t.criterios, estudiante: $('nombre').value.trim(), texto });
+        const d = await crearDocumento({ codigo: t.codigo, titulo: titulo || t.titulo, curso: t.curso, tarea: t.titulo, criterios: t.criterios, estudiante: $('nombre').value.trim(), texto });
         const r = await fetch('api/casos?id=' + encodeURIComponent(d.casoId));
         if (!r.ok) throw new Error('Tu trabajo se procesó, pero no se pudo cargar. Intenta de nuevo.');
         S.caso = await r.json();
@@ -236,30 +238,73 @@
     });
   });
 
+  /* ---------- profesor: documento de la tarea ---------- */
+  let enunciado = null;
+  window.enunciadoTarea = () => (enunciado ? { enunciado: enunciado.texto, enunciadoNombre: enunciado.nombre } : {});
+
+  function montarEnunciado() {
+    enunciado = null;
+    const caja = $('caja-enunciado');
+    const vista = crearCaja(caja, {
+      etiqueta: 'Sube el documento de la tarea',
+      minimo: MIN_PALABRAS_ENUNCIADO,
+      maximo: MAX_PALABRAS_ENUNCIADO,
+      async procesar(texto, titulo) {
+        enunciado = { texto, nombre: titulo || 'Enunciado' };
+        vista.listo(`Listo: ${enunciado.nombre} (${contarPalabras(texto).toLocaleString('es-PE')} palabras).`);
+        const quitar = document.createElement('button');
+        quitar.type = 'button';
+        quitar.className = 'enlace-texto';
+        quitar.textContent = 'Quitar documento';
+        quitar.onclick = montarEnunciado;
+        caja.firstChild.appendChild(quitar);
+      },
+    });
+  }
+  montarEnunciado();
+
   /* ---------- profesor: elige el origen del trabajo ---------- */
   // app.js solo llena #t-caso si está vacío; por eso la opción se agrega después de que lo llene.
   const selector = $('t-caso');
+  const nuevaOpcion = (valor, texto) => {
+    const o = document.createElement('option');
+    o.value = valor;
+    o.textContent = texto;
+    return o;
+  };
+  const AYUDA_ORIGEN = {
+    estudiante: 'Al entrar con el código, cada estudiante subirá su .pdf o .docx.',
+    subir: 'Toda la clase defenderá el archivo que subas aquí.',
+  };
+
+  function actualizarOrigen() {
+    const subir = selector.value === 'subir';
+    const zona = $('caja-base-prof');
+    $('t-origen-ayuda').textContent = AYUDA_ORIGEN[selector.value] || 'Toda la clase defenderá este trabajo.';
+    $('b-crear').disabled = subir;
+    zona.classList.toggle('oculto', !subir);
+    if (subir) montarBase();
+    else zona.replaceChildren();
+  }
+
   new MutationObserver(() => {
     if (selector.querySelector('option[value="estudiante"]')) return;
-    const o = document.createElement('option');
-    o.value = 'estudiante';
-    o.textContent = 'Cada estudiante entrega su propio archivo (.pdf / .docx)';
-    selector.prepend(o);
+    selector.prepend(nuevaOpcion('estudiante', 'El de cada estudiante: cada uno sube su archivo'));
+    selector.appendChild(nuevaOpcion('subir', 'Subir un archivo para toda la clase…'));
     selector.value = 'estudiante';
+    actualizarOrigen();
   }).observe(selector, { childList: true });
+  selector.addEventListener('change', actualizarOrigen);
 
-  const vistaBase = crearCaja($('caja-base-prof'), {
-    etiqueta: 'Subir un trabajo base propio',
+  const montarBase = () => crearCaja($('caja-base-prof'), {
+    etiqueta: 'Sube el trabajo que defenderá la clase',
     async procesar(texto, titulo, avisar) {
       avisar('2/2 Preparando las dudas de Carlos…');
       const tituloBase = titulo || $('t-titulo').value;
       const d = await crearDocumento({ titulo: tituloBase, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
-      const o = document.createElement('option');
-      o.value = d.casoId;
-      o.textContent = 'Trabajo subido: ' + d.titulo;
-      selector.appendChild(o);
+      selector.querySelector('option[value="subir"]').before(nuevaOpcion(d.casoId, 'Trabajo subido: ' + d.titulo));
       selector.value = d.casoId;
-      vistaBase.listo(`Listo: toda la clase defenderá "${d.titulo}".`);
+      actualizarOrigen();
     },
   });
 })();
