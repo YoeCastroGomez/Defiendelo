@@ -216,6 +216,7 @@ async function crearTarea(e) {
     if (!r.ok) throw new Error(d.error || 'No se pudo crear la tarea');
     $('c-codigo').textContent = d.codigo;
     $('c-aviso').textContent = d.persistente ? 'El código queda activo 60 días.' : 'Demo sin base de datos: el código dura mientras el servidor siga encendido.';
+    if (window.mostrarTokenCreado) window.mostrarTokenCreado(d);
     $('creada').classList.remove('oculto');
     $('creada').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
@@ -419,10 +420,12 @@ function reporte() {
     b.textContent = 'Intentar de nuevo'; b.onclick = () => mostrar('inicio');
   } else {
     h.textContent = 'Reporte para el profesor';
-    t.textContent = 'En el producto, este reporte (con el trabajo marcado y la conversación) llega al profesor. En esta demo no se envía a ningún lado.';
+    t.id = 'r-estado-envio';
+    t.textContent = 'Enviando tu reporte y trabajo marcado al profesor…';
     b.textContent = 'Volver al inicio'; b.onclick = () => mostrar('inicio');
   }
   sig.append(h, t, b);
+  if (S.modo === 'evaluacion' && window.registrarSesionEvaluacion) window.registrarSesionEvaluacion(seg);
   mostrar('reporte');
 }
 function enfocarPunto(pid) {
