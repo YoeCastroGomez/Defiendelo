@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     if (b.codigo) {
       const t = await obtenerTareaInterna(b.codigo);
       if (!t) return res.status(404).json({ error: 'No existe una tarea con ese código' });
-      Object.assign(datos, { curso: t.curso, tarea: t.titulo, criterios: t.criterios, enunciado: t.enunciado });
+      Object.assign(datos, { curso: t.curso, tarea: t.titulo, criterios: t.criterios, enunciado: t.enunciado, teoria: t.teoria });
     }
 
     const { caso } = await generarCaso({ ...datos, id: nuevoCasoId() });

@@ -209,8 +209,10 @@ async function entrarConCodigo(e) {
   $('i-crit').textContent = t.criterios || '';
   $('i-crit-caja').classList.toggle('oculto', !t.criterios);
   $('i-enunciado-caja').classList.toggle('oculto', !t.enunciado);
-  $('i-enunciado-nombre').textContent = 'Leer el documento de la tarea' + (t.enunciadoNombre ? ': ' + t.enunciadoNombre : '');
+  $('i-enunciado-nombre').textContent = 'Leer las instrucciones de la tarea';
   $('i-enunciado').textContent = t.enunciado || '';
+  $('i-teoria-caja').classList.toggle('oculto', !t.teoria);
+  $('i-teoria').textContent = t.teoria || '';
   $('i-codigo').textContent = t.codigo;
   $('i-tarea').textContent = S.caso ? S.caso.documento.titulo : 'Aún no subes tu resolución';
   $('i-prov').textContent = S.caso?.provisional ? 'caso de ejemplo provisional' : '';

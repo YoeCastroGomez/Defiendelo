@@ -7,6 +7,8 @@
   const MAX_PALABRAS = 15000;
   const MIN_PALABRAS_ENUNCIADO = 5;
   const MAX_PALABRAS_ENUNCIADO = 5000;
+  const MAX_PALABRAS_TEORIA = 15000;
+  const MAX_ARCHIVOS_MATERIAL = 5;
   const CDN_PDF = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   const CDN_MAMMOTH = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js';
   const ACCEPT = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -96,7 +98,7 @@
   }
 
   // Dibuja la zona de subida. `procesar(texto, titulo, avisar)` hace lo que corresponda con el texto validado.
-  function crearCaja(contenedor, { etiqueta, procesar, minimo = MIN_PALABRAS, maximo = MAX_PALABRAS }) {
+  function crearCaja(contenedor, { etiqueta, procesar, minimo = MIN_PALABRAS, maximo = MAX_PALABRAS, varios = false }) {
     contenedor.replaceChildren();
     const raiz = document.createElement('div');
     raiz.className = 'pila-c';
@@ -104,6 +106,7 @@
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = ACCEPT;
+    input.multiple = varios;
     input.className = 'oculto';
 
     const zona = document.createElement('button');
@@ -159,9 +162,11 @@
         const mal = validarPalabras(texto, minimo, maximo);
         if (mal) throw new Error(mal);
         await procesar(texto, titulo, (m) => { estado.textContent = m; }, archivo);
+        return true;
       } catch (e) {
         estado.textContent = '';
         error.textContent = e.message;
+        return false;
       } finally {
         ocupado(false);
         input.value = '';
@@ -169,24 +174,31 @@
     }
 
     function elegir(archivo) {
-      if (!archivo) return;
+      if (!archivo) return false;
       error.textContent = '';
       const mal = errorDeArchivo(archivo);
-      if (mal) { estado.textContent = ''; error.textContent = mal; input.value = ''; return; }
-      ejecutar(() => {
+      if (mal) { estado.textContent = ''; error.textContent = mal; input.value = ''; return false; }
+      return ejecutar(() => {
         estado.textContent = '1/2 Leyendo archivo en tu navegador…';
         return extraerTexto(archivo);
       }, tituloDeArchivo(archivo.name), archivo);
     }
 
+    // Se procesan en orden y se para en el primer error, para que su mensaje quede a la vista.
+    async function elegirVarios(archivos) {
+      for (const archivo of varios ? [...archivos] : [...archivos].slice(0, 1)) {
+        if (!(await elegir(archivo))) return;
+      }
+    }
+
     zona.onclick = () => input.click();
-    input.onchange = () => elegir(input.files[0]);
+    input.onchange = () => elegirVarios(input.files);
     zona.ondragover = (e) => { e.preventDefault(); zona.classList.add('encima'); };
     zona.ondragleave = () => zona.classList.remove('encima');
     zona.ondrop = (e) => {
       e.preventDefault();
       zona.classList.remove('encima');
-      if (!zona.disabled) elegir(e.dataTransfer.files[0]);
+      if (!zona.disabled) elegirVarios(e.dataTransfer.files);
     };
     abrirPegado.onclick = () => { cajaPegado.classList.toggle('oculto'); if (!cajaPegado.classList.contains('oculto')) area.focus(); };
     area.oninput = () => { contador.textContent = `${contarPalabras(area.value).toLocaleString('es-PE')} / ${maximo.toLocaleString('es-PE')} palabras`; };
@@ -233,6 +245,30 @@
     return d;
   }
 
+  function botonesDescarga(contenedor, tarea, nombres, tipo) {
+    contenedor.replaceChildren(...(nombres || []).map((nombre, indice) => {
+      const bajar = document.createElement('button');
+      bajar.type = 'button';
+      bajar.className = 'enlace-texto';
+      bajar.textContent = 'Descargar ' + nombre;
+      bajar.onclick = async () => {
+        bajar.disabled = true;
+        try {
+          const q = new URLSearchParams({ codigo: tarea.codigo, indice, tipo });
+          const r = await fetch('api/archivos?' + q);
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error);
+          location.href = d.url;
+        } catch {
+          bajar.textContent = 'No se pudo descargar ' + nombre + '. Intenta de nuevo.';
+        } finally {
+          bajar.disabled = false;
+        }
+      };
+      return bajar;
+    }));
+  }
+
   /* ---------- estudiante: entrega su propio trabajo ---------- */
   window.addEventListener('defiendelo:inicio', (ev) => {
     const caja = $('caja-entrega-est');
@@ -242,21 +278,8 @@
     chip.textContent = entrega ? 'pendiente' : 'listo';
     chip.classList.toggle('ok', !entrega);
     $('b-empezar').disabled = entrega;
-    const bajar = $('b-bajar-enunciado');
-    bajar.classList.toggle('oculto', !ev.detail.enunciadoDescargable);
-    bajar.onclick = async () => {
-      bajar.disabled = true;
-      try {
-        const r = await fetch('api/archivos?codigo=' + encodeURIComponent(ev.detail.codigo));
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error);
-        location.href = d.url;
-      } catch {
-        bajar.textContent = 'No se pudo descargar. Intenta de nuevo.';
-      } finally {
-        bajar.disabled = false;
-      }
-    };
+    botonesDescarga($('i-enunciado-archivos'), ev.detail, ev.detail.enunciadoDescargas, 'enunciado');
+    botonesDescarga($('i-teoria-archivos'), ev.detail, ev.detail.teoriaDescargas, 'teoria');
     if (!entrega) { caja.replaceChildren(); return; }
 
     const vista = crearCaja(caja, {
@@ -280,32 +303,60 @@
     });
   });
 
-  /* ---------- profesor: documento de la tarea ---------- */
-  let enunciado = null;
-  window.enunciadoTarea = () => (enunciado ? { enunciado: enunciado.texto, enunciadoNombre: enunciado.nombre, enunciadoArchivo: enunciado.original } : {});
-
-  function montarEnunciado() {
-    enunciado = null;
-    const caja = $('caja-enunciado');
-    const vista = crearCaja(caja, {
-      etiqueta: 'Sube el documento de la tarea',
-      minimo: MIN_PALABRAS_ENUNCIADO,
-      maximo: MAX_PALABRAS_ENUNCIADO,
-      async procesar(texto, titulo, avisar, archivo) {
-        avisar('Guardando tu archivo…');
-        const original = await guardarOriginal(archivo, 'enunciado');
-        enunciado = { texto, nombre: titulo || 'Enunciado', original };
-        vista.listo(`Listo: ${enunciado.nombre} (${contarPalabras(texto).toLocaleString('es-PE')} palabras).`);
+  /* ---------- profesor: instrucciones y teoría ---------- */
+  function cajaMaterial(idCaja, etiqueta, maximo, porDefecto) {
+    let documentos = [];
+    const lista = document.createElement('div');
+    lista.className = 'pila-c';
+    function pintar() {
+      lista.replaceChildren(...documentos.map((d) => {
+        const fila = document.createElement('div');
+        fila.className = 'archivo';
+        const nombre = document.createElement('span');
+        nombre.textContent = d.nombre;
         const quitar = document.createElement('button');
         quitar.type = 'button';
         quitar.className = 'enlace-texto';
-        quitar.textContent = 'Quitar documento';
-        quitar.onclick = montarEnunciado;
-        caja.firstChild.appendChild(quitar);
+        quitar.textContent = 'Quitar';
+        quitar.setAttribute('aria-label', 'Quitar ' + d.nombre);
+        quitar.onclick = () => { documentos = documentos.filter((x) => x !== d); pintar(); };
+        fila.append(nombre, quitar);
+        return fila;
+      }));
+    }
+    crearCaja($(idCaja), {
+      etiqueta,
+      minimo: MIN_PALABRAS_ENUNCIADO,
+      maximo,
+      varios: true,
+      async procesar(texto, titulo, avisar, archivo) {
+        if (documentos.length >= MAX_ARCHIVOS_MATERIAL) throw new Error(`Puedes subir hasta ${MAX_ARCHIVOS_MATERIAL} archivos aquí.`);
+        const total = documentos.reduce((n, d) => n + contarPalabras(d.texto), contarPalabras(texto));
+        if (total > maximo) throw new Error(`Estos archivos suman ${total.toLocaleString('es-PE')} palabras y el máximo es ${maximo.toLocaleString('es-PE')}.`);
+        avisar('Guardando tu archivo…');
+        const original = await guardarOriginal(archivo, 'enunciado');
+        documentos.push({ texto, nombre: titulo || porDefecto, original });
+        pintar();
+        avisar('');
       },
     });
+    $(idCaja).appendChild(lista);
+    return {
+      texto: () => documentos.map((d) => `--- ${d.nombre} ---\n${d.texto}`).join('\n\n'),
+      nombres: () => documentos.map((d) => d.nombre).join(', ').slice(0, 120),
+      archivos: () => documentos.map((d) => d.original).filter(Boolean),
+    };
   }
-  montarEnunciado();
+
+  const instrucciones = cajaMaterial('caja-enunciado', 'Sube las instrucciones de la tarea', MAX_PALABRAS_ENUNCIADO, 'Instrucciones');
+  const teoria = cajaMaterial('caja-teoria', 'Sube la teoría del curso', MAX_PALABRAS_TEORIA, 'Teoría');
+  window.enunciadoTarea = () => ({
+    enunciado: instrucciones.texto(),
+    enunciadoNombre: instrucciones.nombres(),
+    enunciadoArchivos: instrucciones.archivos(),
+    teoria: teoria.texto(),
+    teoriaArchivos: teoria.archivos(),
+  });
 
   /* ---------- profesor: elige el origen del trabajo ---------- */
   // app.js solo llena #t-caso si está vacío; por eso la opción se agrega después de que lo llene.
@@ -317,14 +368,14 @@
     return o;
   };
   const AYUDA_ORIGEN = {
-    estudiante: 'Al entrar con el código, cada estudiante subirá su .pdf o .docx.',
-    subir: 'Toda la clase defenderá el archivo que subas aquí.',
+    estudiante: 'Es lo normal: cada estudiante entra con el código, sube su tarea y la defiende.',
+    subir: 'Solo para casos especiales, como una lectura común: nadie sube nada y todos defienden este archivo.',
   };
 
   function actualizarOrigen() {
     const subir = selector.value === 'subir';
     const zona = $('caja-base-prof');
-    $('t-origen-ayuda').textContent = AYUDA_ORIGEN[selector.value] || 'Toda la clase defenderá este trabajo.';
+    $('t-origen-ayuda').textContent = AYUDA_ORIGEN[selector.value] || 'Trabajo de ejemplo: nadie sube nada y todos defienden este documento.';
     $('b-crear').disabled = subir;
     zona.classList.toggle('oculto', !subir);
     if (subir) montarBase();
@@ -333,15 +384,15 @@
 
   new MutationObserver(() => {
     if (selector.querySelector('option[value="estudiante"]')) return;
-    selector.prepend(nuevaOpcion('estudiante', 'El de cada estudiante: cada uno sube su archivo'));
-    selector.appendChild(nuevaOpcion('subir', 'Subir un archivo para toda la clase…'));
+    selector.prepend(nuevaOpcion('estudiante', 'Su propia tarea: cada estudiante sube su archivo (recomendado)'));
+    selector.appendChild(nuevaOpcion('subir', 'Un mismo trabajo para todos: lo subo yo…'));
     selector.value = 'estudiante';
     actualizarOrigen();
   }).observe(selector, { childList: true });
   selector.addEventListener('change', actualizarOrigen);
 
   const montarBase = () => crearCaja($('caja-base-prof'), {
-    etiqueta: 'Sube el trabajo que defenderá la clase',
+    etiqueta: 'Sube el trabajo común',
     async procesar(texto, titulo, avisar, archivo) {
       avisar('Guardando tu archivo…');
       const original = await guardarOriginal(archivo, 'resolucion');

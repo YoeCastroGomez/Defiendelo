@@ -57,10 +57,13 @@
       <div class="pila-c"><label class="etq" for="t-titulo">Título de la tarea</label><input id="t-titulo" type="text" placeholder="p. ej. Informe final de arquitectura" required maxlength="120"></div>
       <div class="pila-c"><label class="etq" for="t-crit">Qué deben poder explicar</label>
         <textarea id="t-crit" class="claro" rows="3" maxlength="600" placeholder="p. ej. Por qué eligieron esa arquitectura y cómo responde a un cambio de requisitos."></textarea></div>
-      <div class="pila-c"><span class="etq" style="margin:0">Documento de la tarea (opcional)</span>
-        <span class="chico suave">El enunciado que deben resolver. Tus estudiantes podrán leerlo y Carlos lo usará para preparar sus dudas.</span>
+      <div class="pila-c"><span class="etq" style="margin:0">Instrucciones de la tarea (opcional, hasta 5 archivos)</span>
+        <span class="chico suave">El enunciado, la rúbrica o lo que necesiten. Tus estudiantes podrán leerlo y descargarlo, y Carlos lo tendrá en cuenta.</span>
         <div id="caja-enunciado"></div></div>
-      <div class="pila-c"><label class="etq" for="t-caso">Qué trabajo se defiende</label><select id="t-caso"></select>
+      <div class="pila-c"><span class="etq" style="margin:0">Teoría del curso (opcional, hasta 5 archivos)</span>
+        <span class="chico suave">Lecturas o apuntes de apoyo. Tus estudiantes podrán leerlos y descargarlos, y Carlos los usará para preparar dudas de este curso.</span>
+        <div id="caja-teoria"></div></div>
+      <div class="pila-c"><label class="etq" for="t-caso">Qué defenderán tus estudiantes</label><select id="t-caso"></select>
         <span class="chico suave" id="t-origen-ayuda"></span>
         <div id="caja-base-prof" class="oculto"></div></div>
       <div class="pila-c"><label class="etq" for="t-cierre">Cierre (opcional)</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
@@ -98,7 +101,8 @@
       <p class="mono suave" id="i-curso"></p>
       <h1 id="i-titulo"></h1>
       <div id="i-crit-caja" class="oculto"><p class="etq">Lo que tu profesor espera que puedas explicar</p><p class="lead" id="i-crit"></p></div>
-      <details id="i-enunciado-caja" class="enunciado oculto"><summary id="i-enunciado-nombre"></summary><div id="i-enunciado"></div><button class="enlace-texto enunciado-bajar oculto" type="button" id="b-bajar-enunciado">Descargar archivo original</button></details>
+      <details id="i-enunciado-caja" class="enunciado oculto"><summary id="i-enunciado-nombre"></summary><div id="i-enunciado"></div><div class="enunciado-bajar pila-c" id="i-enunciado-archivos"></div></details>
+      <details id="i-teoria-caja" class="enunciado oculto"><summary>Leer la teoría del curso</summary><div id="i-teoria" class="texto-material"></div><div class="enunciado-bajar pila-c" id="i-teoria-archivos"></div></details>
     </div>
     <div class="tarjeta inicio-form">
       <div class="fila entre"><p class="etq" style="margin:0">Trabajo</p><span class="mono chico suave">código <b id="i-codigo"></b></span></div>

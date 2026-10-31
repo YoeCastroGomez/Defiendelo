@@ -270,6 +270,7 @@ describe('/api/sesiones', () => {
 
 describe('/api/archivos', () => {
   const RUTA_ENUNCIADO = 'enunciados/' + 'a'.repeat(32) + '.pdf';
+  const RUTA_ENUNCIADO_2 = 'enunciados/' + 'c'.repeat(32) + '.pdf';
   const RUTA_ENTREGA = 'resoluciones/' + 'b'.repeat(32) + '.docx';
   const texto = Array.from({ length: 300 }, (_, k) => `palabra${k}${k % 12 === 11 ? '.' : ''}`).join(' ');
   let fetchOriginal;
@@ -305,18 +306,26 @@ describe('/api/archivos', () => {
   });
 
   test('el enunciado se baja con el código y no expone su ruta', async () => {
-    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivo: { ruta: RUTA_ENUNCIADO, nombre: 'Guía' } } });
+    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivos: [{ ruta: RUTA_ENUNCIADO, nombre: 'Guía' }, { ruta: RUTA_ENUNCIADO_2, nombre: 'Rúbrica' }] } });
+    const conTeoria = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', teoriaArchivos: [{ ruta: RUTA_ENUNCIADO_2, nombre: 'Lectura' }] } });
+    const lectura = await llamar(apiArchivos, { query: { codigo: conTeoria.json.codigo, tipo: 'teoria' } });
+    assert.match(lectura.json.url, /download=Lectura\.pdf$/);
+    assert.deepEqual((await llamar(apiTareas, { query: { codigo: conTeoria.json.codigo } })).json.teoriaDescargas, ['Lectura.pdf']);
     const { codigo } = creada.json;
     const publica = await llamar(apiTareas, { query: { codigo } });
-    assert.equal(publica.json.enunciadoDescargable, true);
+    assert.deepEqual(publica.json.enunciadoDescargas, ['Guía.pdf', 'Rúbrica.pdf']);
     assert.equal(JSON.stringify(publica.json).includes(RUTA_ENUNCIADO), false);
     const r = await llamar(apiArchivos, { query: { codigo } });
     assert.equal(r.status, 200);
     assert.match(r.json.url, /download=Gu%C3%ADa\.pdf$/);
+    const segundo = await llamar(apiArchivos, { query: { codigo, indice: '1' } });
+    assert.match(segundo.json.url, /download=R%C3%BAbrica\.pdf$/);
+    assert.equal((await llamar(apiArchivos, { query: { codigo, indice: '5' } })).status, 404);
+    assert.equal((await llamar(apiArchivos, { query: { codigo, tipo: 'teoria' } })).status, 404);
   });
 
   test('una ruta inventada por el cliente se descarta', async () => {
-    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivo: { ruta: '../secreto.pdf', nombre: 'x' } } });
+    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T', curso: 'C', casoId: 'estudiante', enunciadoArchivos: [{ ruta: '../secreto.pdf', nombre: 'x' }] } });
     assert.equal((await llamar(apiArchivos, { query: { codigo: creada.json.codigo } })).status, 404);
   });
 
@@ -396,6 +405,19 @@ describe('/api/documentos', () => {
     ia.restaurar();
     assert.match(ia.prompts[0], /ENUNCIADO-DE-PRUEBA/);
     assert.equal(ia.prompts[0].includes('FALSO'), false);
+  });
+
+  test('la teoría del profesor llega al estudiante y a la IA', async () => {
+    const creada = await llamar(apiTareas, { method: 'POST', body: { titulo: 'T1', curso: 'C1', casoId: 'estudiante', teoria: 'TEORIA-DE-PRUEBA' } });
+    const { codigo } = creada.json;
+    assert.equal((await llamar(apiTareas, { query: { codigo } })).json.teoria, 'TEORIA-DE-PRUEBA');
+    const ia = simularIA([{ status: 500, error: 'x' }, { status: 500, error: 'x' }]);
+    const original = console.error;
+    console.error = () => {};
+    await llamar(apiDocumentos, { method: 'POST', body: { codigo, titulo: 'Resolución', texto: palabras(300) } });
+    console.error = original;
+    ia.restaurar();
+    assert.match(ia.prompts[0], /TEORIA-DE-PRUEBA/);
   });
 
   test('un código de tarea inexistente responde 404', async () => {

@@ -14,6 +14,11 @@ function errorHttp(mensaje, status = 400) {
 }
 
 const limpio = (v, max) => String(v || '').trim().slice(0, max);
+const MAX_ARCHIVOS = 5;
+const archivosEnviados = (lista) => (Array.isArray(lista) ? lista : []).map((a) => limpiarArchivo(a, 'enunciado')).filter(Boolean).slice(0, MAX_ARCHIVOS);
+
+// Las tareas creadas antes guardaban un solo archivo en enunciadoArchivo.
+export const archivosDeInstrucciones = (t) => t.enunciadoArchivos || (t.enunciadoArchivo ? [t.enunciadoArchivo] : []);
 
 const nuevoCodigo = () => {
   const c = Array.from({ length: 6 }, () => ALFABETO[randomInt(ALFABETO.length)]).join('');
@@ -70,7 +75,9 @@ export async function crearTarea(datos = {}) {
     criterios: limpio(datos.criterios, 600),
     enunciado: limpio(datos.enunciado, 40000),
     enunciadoNombre: limpio(datos.enunciadoNombre, 120),
-    enunciadoArchivo: limpiarArchivo(datos.enunciadoArchivo, 'enunciado'),
+    teoria: limpio(datos.teoria, 150000),
+    teoriaArchivos: archivosEnviados(datos.teoriaArchivos),
+    enunciadoArchivos: archivosEnviados(datos.enunciadoArchivos),
     cierre: limpio(datos.cierre, 40),
     casoId,
     tokenProfesor,
@@ -96,8 +103,12 @@ export async function obtenerTareaInterna(codigoRaw) {
 export async function obtenerTareaPublica(codigoRaw) {
   const t = await obtenerTareaInterna(codigoRaw);
   if (!t) return null;
-  const { tokenProfesor, enunciadoArchivo, ...publica } = t;
-  return { ...publica, enunciadoDescargable: !!enunciadoArchivo };
+  const { tokenProfesor, enunciadoArchivo, enunciadoArchivos, teoriaArchivos, ...publica } = t;
+  return {
+    ...publica,
+    enunciadoDescargas: archivosDeInstrucciones(t).map((a) => a.nombre),
+    teoriaDescargas: (teoriaArchivos || []).map((a) => a.nombre),
+  };
 }
 
 export function verificarTokenProfesor(tarea, tokenRecibido) {

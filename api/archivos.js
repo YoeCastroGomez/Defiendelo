@@ -1,7 +1,7 @@
 // POST /api/archivos                     → enlace temporal para subir un .pdf o .docx directo al almacén
-// GET  /api/archivos?codigo=X            → enlace temporal para bajar el documento de la tarea
+// GET  /api/archivos?codigo=X&indice=N&tipo=teoria → enlace temporal para bajar instrucciones o teoría
 // GET  /api/archivos?codigo=X&casoId=Y   → enlace temporal para bajar una entrega (con x-token-profesor)
-import { prepararSubida, enlaceEnunciado, enlaceEntrega } from '../modulos/archivos/archivos.js';
+import { prepararSubida, enlaceMaterial, enlaceEntrega } from '../modulos/archivos/archivos.js';
 import * as almacen from '../compartido/almacen.js';
 
 const MAX_POR_MINUTO = 20;
@@ -26,8 +26,8 @@ export default async function handler(req, res) {
       return res.status(201).json(await prepararSubida(body));
     }
     if (req.method === 'GET') {
-      const { codigo, casoId } = req.query || {};
-      if (!casoId) return res.status(200).json(await enlaceEnunciado(codigo));
+      const { codigo, casoId, indice, tipo } = req.query || {};
+      if (!casoId) return res.status(200).json(await enlaceMaterial(codigo, indice, tipo));
       const h = req.headers?.['x-token-profesor'];
       return res.status(200).json(await enlaceEntrega(codigo, String(casoId), Array.isArray(h) ? h[0] : String(h || '')));
     }
