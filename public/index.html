@@ -88,10 +88,12 @@
         <legend class="etq">Tipo de actividad</legend>
         <div class="dos-col">
           <label class="opcion"><input type="radio" name="t-tipo" value="evaluacion" required>
-            <span><b>Evaluación calificada</b><br><span class="suave chico">Cuenta para la nota. Al vencer el plazo, se cierran las entregas.</span></span></label>
+            <span><b>Evaluación calificada</b><br><span class="suave chico">Un solo intento, respondiendo por voz. Al vencer el plazo, se cierran las entregas.</span></span></label>
           <label class="opcion"><input type="radio" name="t-tipo" value="practica">
-            <span><b>Práctica</b><br><span class="suave chico">Para entrenar. La fecha es de referencia y no bloquea nada.</span></span></label>
+            <span><b>Práctica</b><br><span class="suave chico">Intentos ilimitados, por voz o escrito. La fecha es de referencia y no bloquea nada.</span></span></label>
         </div>
+        <label class="casilla oculto" id="op-escrito"><input type="checkbox" id="t-escrito">
+          <span><b>Permitir responder por escrito en la evaluación</b><br><span class="suave chico">Por defecto, la evaluación se rinde solo hablando. Márcalo para casos justificados, como una dificultad del habla o no tener micrófono.</span></span></label>
       </fieldset>
 
       <div class="pila-c"><label class="etq" for="t-fecha">Fecha límite</label>
@@ -116,7 +118,7 @@
       </fieldset>
 
       <div class="pila-c" id="zona-propia"><span class="etq" style="margin:0">Material para la tarea (opcional, hasta 10 archivos)</span>
-        <span class="chico suave">Guías, rúbricas, plantillas y teoría del curso, todo en un solo lugar. Indica qué es cada archivo: tus estudiantes podrán leerlos y descargarlos, y Carlos los usará para preparar sus dudas.</span>
+        <span class="chico suave">Guías, rúbricas, plantillas y teoría del curso, todo en un solo lugar. Tus estudiantes podrán leerlos y descargarlos, y Carlos los usará para preparar sus dudas.</span>
         <div id="caja-material"></div></div>
 
       <div class="pila-c oculto" id="zona-comun"><span class="etq" style="margin:0">Documento que defenderán</span>
@@ -187,24 +189,25 @@
       <div id="caja-entrega-est" class="oculto"></div>
       <div class="pila-c"><label class="etq" for="nombre" style="margin:0">Tu nombre</label><input id="nombre" type="text" autocomplete="name" maxlength="80"><p class="error" id="nombre-err" role="alert"></p></div>
 
-      <fieldset>
-        <legend class="etq">Qué quieres hacer</legend>
-        <label class="opcion"><input type="radio" name="modo" value="practica" checked>
-          <span><b>Ensayar</b><br><span class="suave">No se envía a tu profesor y tu tarea sigue sin entregar. Puedes repetirlo las veces que quieras.</span></span></label>
-        <label class="opcion" id="op-entregar"><input type="radio" name="modo" value="evaluacion">
-          <span><b>Entregar</b><br><span class="suave" id="op-entregar-txt">Tu profesor recibe el reporte. Tienes un solo intento: si sales a mitad, se entrega lo que llevas. Carlos trae dudas nuevas.</span></span></label>
-      </fieldset>
+      <div class="reglas-rendir" id="reglas-rendir">
+        <div class="fila entre" style="gap:8px;flex-wrap:wrap">
+          <b id="reglas-titulo"></b>
+          <span class="chip" id="reglas-intentos"></span>
+        </div>
+        <ul class="chico" id="reglas-lista"></ul>
+      </div>
 
-      <fieldset>
+      <fieldset id="f-respuesta">
         <legend class="etq">Cómo vas a responder</legend>
         <label class="opcion" id="op-voz"><input type="radio" name="respuesta" value="voz" checked>
           <span><b>Hablando</b><br><span class="suave" id="op-voz-txt">Le explicas a Carlos en voz alta y ves lo que se transcribe.</span></span></label>
-        <label class="opcion"><input type="radio" name="respuesta" value="texto">
+        <label class="opcion" id="op-texto"><input type="radio" name="respuesta" value="texto">
           <span><b>Escribiendo</b><br><span class="suave">Le escribes tu explicación. Puedes cambiar durante la defensa.</span></span></label>
       </fieldset>
+      <p class="chico suave oculto" id="aviso-voz"></p>
 
       <p class="chico suave">Puedes haber usado IA para hacer tu trabajo; aquí importa que lo entiendas. Tu trabajo estará a la vista todo el tiempo.</p>
-      <button class="btn" id="b-empezar" type="button">Empezar con Carlos</button>
+      <button class="btn" id="b-empezar" type="button">Rendir</button>
     </div>
   </main>
 </section>
@@ -413,7 +416,7 @@
 
       <section class="kpis-profe" aria-label="Resumen ejecutivo">
         <div class="kpi-card">
-          <span class="mono chico suave">entregas recibidas</span>
+          <span class="mono chico suave" id="kpi-total-etq">entregas recibidas</span>
           <span class="kpi-num" id="kpi-total">0</span>
           <span class="chico suave" id="kpi-duracion">sin sesiones registradas</span>
         </div>
