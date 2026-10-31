@@ -100,6 +100,7 @@ function toggleMic() {
       (e.results[k].isFinal ? (fin += e.results[k][0].transcript) : (tmp += e.results[k][0].transcript));
     }
     $('resp').value = base + fin + tmp;
+    actualizarBorrar();
   };
   rec.onend = () => { grabando = false; $('b-mic').textContent = '● Hablar'; $('b-mic').classList.remove('grabando'); if ($('d-aviso').textContent === ESCUCHANDO) $('d-aviso').textContent = ''; };
   rec.onerror = (e) => { $('d-aviso').textContent = ERRORES_MIC[e.error] || 'No se pudo usar el micrófono. Puedes escribir tu respuesta.'; };
@@ -113,12 +114,27 @@ function detenerMic() {
   rec.onresult = null;
   rec.stop();
 }
+// En modo voz, el cuadro solo muestra lo que se transcribe: no se puede escribir ni pegar.
+// Si el dictado salió mal, se borra y se vuelve a hablar.
 function aplicarModoRespuesta() {
   const voz = S.respuesta === 'voz';
   $('b-mic').classList.toggle('oculto', !voz);
   $('b-cambiar').classList.toggle('oculto', !SR);
   $('b-cambiar').textContent = voz ? 'Prefiero escribir' : 'Prefiero hablar';
-  $('resp').placeholder = voz ? 'Pulsa Hablar y explícale a Carlos. Aquí verás lo que dices y podrás corregirlo.' : 'Escribe tu explicación con tus palabras…';
+  $('resp').readOnly = voz;
+  $('resp').classList.toggle('transcripcion', voz);
+  $('resp').placeholder = voz ? 'Pulsa Hablar y explícale a Carlos. Aquí verás lo que vas diciendo.' : 'Escribe tu explicación con tus palabras…';
+  actualizarBorrar();
+}
+function actualizarBorrar() {
+  $('b-borrar').classList.toggle('oculto', S.respuesta !== 'voz' || !$('resp').value.trim());
+}
+function borrarDictado() {
+  detenerMic();
+  base = '';
+  $('resp').value = '';
+  $('d-aviso').textContent = '';
+  actualizarBorrar();
 }
 
 /* ---------- documento ---------- */
@@ -342,7 +358,7 @@ function abrirPunto() {
   S.hist = [{ rol: 'carlos', texto: p.apertura }];
   S.repregunto = false;
   $('d-punto').textContent = `punto ${S.i + 1} de ${S.caso.puntos.length}`;
-  $('resp').value = ''; $('d-aviso').textContent = '';
+  $('resp').value = ''; $('d-aviso').textContent = ''; actualizarBorrar();
   if ($('cinta-condicion')) $('cinta-condicion').classList.toggle('oculto', tp !== 'condicion');
   fijarAvatar(tp === 'trampa' ? 'confundido' : 'curioso');
   modoRespuesta(true);
@@ -354,7 +370,7 @@ function abrirPunto() {
   if (f && caja.scrollHeight > caja.clientHeight) caja.scrollTo({ top: f.offsetTop - caja.clientHeight / 3, behavior: 'smooth' });
 }
 function modoRespuesta(on) {
-  ['b-mic', 'b-enviar', 'b-nose', 'b-sim', 'b-cambiar', 'resp'].forEach((id) => { $(id).disabled = !on; });
+  ['b-mic', 'b-enviar', 'b-nose', 'b-sim', 'b-cambiar', 'b-borrar', 'resp'].forEach((id) => { $(id).disabled = !on; });
   if (on) $('d-controles').classList.remove('oculto');
   $('b-sig').classList.toggle('oculto', on);
 }
@@ -442,6 +458,7 @@ async function responder(texto) {
     S.repregunto = true;
     S.hist.push({ rol: 'carlos', texto: r.carlos_dice });
     $('resp').value = '';
+    actualizarBorrar();
     actualizarTermometro(r.nivel, true);
     modoRespuesta(true);
     decir(r.carlos_dice);
@@ -544,6 +561,8 @@ function enviarRespuesta() {
   responder($('resp').value);
 }
 $('b-enviar').onclick = enviarRespuesta;
+$('b-borrar').onclick = borrarDictado;
+$('resp').addEventListener('input', actualizarBorrar);
 $('b-cambiar').onclick = () => {
   detenerMic();
   S.respuesta = S.respuesta === 'voz' ? 'texto' : 'voz';
@@ -581,7 +600,7 @@ if (!SR) {
   $('op-voz-txt').textContent = 'Este navegador no permite dictado. Para hablar, abre la página en Chrome o Edge.';
 }
 $('b-nose').onclick = () => responder('No sé.');
-$('b-sim').onclick = () => { $('resp').value = punto()?.simulado?.respuesta || `Explicación con mis propias palabras sobre ${punto()?.tema || 'este punto'} justificando la decisión del diseño.`; };
+$('b-sim').onclick = () => { $('resp').value = punto()?.simulado?.respuesta || `Explicación con mis propias palabras sobre ${punto()?.tema || 'este punto'} justificando la decisión del diseño.`; actualizarBorrar(); };
 $('b-sig').onclick = siguiente;
 $('resp').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) enviarRespuesta(); });
 $('resp').addEventListener('paste', (e) => {
