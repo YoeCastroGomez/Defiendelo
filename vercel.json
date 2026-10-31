@@ -1,6 +1,8 @@
 {
   "functions": {
-    "api/carlos.js": { "includeFiles": "public/casos/**", "maxDuration": 30 },
-    "api/tareas.js": { "includeFiles": "public/casos/**" }
+    "api/*.js": {
+      "includeFiles": "modulos/casos/datos/**",
+      "maxDuration": 30
+    }
   }
 }

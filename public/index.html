@@ -31,8 +31,11 @@
       </form>
       <div class="tarjeta pila">
         <p class="etq">Soy profesor</p>
-        <p class="suave chico">Crea una defensa y comparte el código con tu clase.</p>
-        <button class="btn claro" type="button" id="b-ir-profe">Crear tarea</button>
+        <p class="suave chico">Crea una defensa para tu clase o consulta los reportes recibidos.</p>
+        <div class="fila">
+          <button class="btn claro" type="button" id="b-ir-profe">Crear tarea</button>
+          <button class="btn claro" type="button" id="b-ir-panel">Ver reportes</button>
+        </div>
       </div>
     </div>
   </main>
@@ -56,7 +59,7 @@
         <textarea id="t-crit" class="claro" rows="3" maxlength="600">Por qué se eligió Observer, cómo reduce el acoplamiento, en qué se diferencia de Strategy y cómo se extiende el diseño.</textarea></div>
       <div class="dos-col">
         <div class="pila-c"><label class="etq" for="t-caso">Trabajo base</label><select id="t-caso"></select>
-          <span class="chico suave">En esta versión, el trabajo viene de un caso preparado.</span></div>
+          <div id="caja-base-prof"></div></div>
         <div class="pila-c"><label class="etq" for="t-cierre">Cierre</label><input id="t-cierre" type="text" placeholder="p. ej. viernes 23:59" maxlength="40"></div>
       </div>
       <p class="error" id="tarea-err" role="alert"></p>
@@ -67,9 +70,15 @@
       <p class="mono chico" style="color:var(--osc-suave)">comparte este código con tus estudiantes</p>
       <p class="codigo-grande" id="c-codigo"></p>
       <p class="chico" id="c-aviso" style="color:var(--osc-suave)"></p>
+      <div id="c-token-caja" class="pila-c oculto" style="border-top:1px solid var(--osc2);padding-top:12px;margin-top:4px">
+        <span class="mono chico" style="color:var(--osc-suave)">tu llave de profesor (guárdala: solo se muestra una vez)</span>
+        <code class="mono" id="c-token" style="font-size:13.5px;color:var(--amarillo);word-break:break-all"></code>
+      </div>
       <div class="fila">
         <button class="btn amarillo" type="button" id="b-copiar">Copiar código</button>
         <button class="btn claro" type="button" id="b-copiar-link">Copiar enlace</button>
+        <button class="btn claro oculto" type="button" id="b-copiar-token">Copiar llave</button>
+        <button class="btn claro oculto" type="button" id="b-ver-reportes-creada">Ver reportes</button>
         <button class="btn fantasma" type="button" id="b-probar">Probar como estudiante</button>
       </div>
     </div>
@@ -92,6 +101,7 @@
       <div class="fila entre"><p class="etq" style="margin:0">Trabajo</p><span class="mono chico suave">código <b id="i-codigo"></b></span></div>
       <div class="archivo"><span id="i-tarea"></span><span class="chip ok">listo</span></div>
       <p class="mono chico suave" id="i-prov"></p>
+      <div id="caja-entrega-est" class="oculto"></div>
       <div class="pila-c"><label class="etq" for="nombre" style="margin:0">Tu nombre</label><input id="nombre" type="text" autocomplete="name" maxlength="80"><p class="error" id="nombre-err" role="alert"></p></div>
 
       <fieldset>
@@ -201,9 +211,99 @@
   </main>
 </section>
 
+<!-- ============ PROFESOR: PANEL DE REPORTES ============ -->
+<section class="pantalla" id="panel-profe">
+  <header class="top">
+    <button class="marca enlace" type="button" data-ir="rol">defiéndelo<span class="cur">_</span></button>
+    <div class="fila">
+      <button class="btn claro" type="button" id="b-panel-nueva">Nueva tarea</button>
+      <span class="mono suave">panel docente</span>
+    </div>
+  </header>
+  <main class="panel-wrap">
+    <form class="tarjeta pila" id="f-panel">
+      <div class="fila entre">
+        <div>
+          <h1 class="titulo" style="font-size:clamp(22px,2.6vw,28px)">Reportes de la clase</h1>
+          <p class="suave chico">Revisa el dominio por punto, el documento marcado y la evidencia de cada estudiante.</p>
+        </div>
+        <button class="btn claro oculto" type="button" id="b-exportar-csv">Exportar CSV</button>
+      </div>
+      <div class="dos-col">
+        <div class="pila-c">
+          <label class="etq" for="p-codigo" style="margin:0">Código de tarea</label>
+          <input id="p-codigo" type="text" autocomplete="off" spellcheck="false" placeholder="ABC-123" maxlength="12" required>
+        </div>
+        <div class="pila-c">
+          <label class="etq" for="p-token" style="margin:0">Llave de profesor</label>
+          <input id="p-token" class="mono" type="text" autocomplete="off" spellcheck="false" placeholder="Pega tu llave secreta">
+        </div>
+      </div>
+      <div class="fila entre">
+        <p class="error" id="panel-err" role="alert" style="margin:0"></p>
+        <div class="fila">
+          <button class="btn claro oculto" type="button" id="b-refrescar-panel">Actualizar</button>
+          <button class="btn" type="submit" id="b-consultar-panel">Ver entregas</button>
+        </div>
+      </div>
+    </form>
+
+    <div id="panel-contenido" class="pila oculto" style="gap:20px">
+      <div class="fila entre">
+        <div>
+          <p class="mono chico suave" id="p-info-curso"></p>
+          <h2 id="p-info-titulo" style="font-size:20px;font-weight:600"></h2>
+        </div>
+        <span class="mono chico suave" id="p-info-foco"></span>
+      </div>
+
+      <section class="kpis-profe" aria-label="Resumen ejecutivo">
+        <div class="kpi-card">
+          <span class="mono chico suave">entregas recibidas</span>
+          <span class="kpi-num" id="kpi-total">0</span>
+          <span class="chico suave" id="kpi-duracion">sin sesiones registradas</span>
+        </div>
+        <div class="kpi-card">
+          <span class="mono chico suave">dominio sugerido</span>
+          <span class="kpi-num" id="kpi-resumen-txt">0 alto</span>
+          <div class="barra-dist" id="kpi-barra" aria-hidden="true"></div>
+          <span class="chico suave" id="kpi-desglose">0 alto · 0 medio · 0 bajo</span>
+        </div>
+        <div class="kpi-card">
+          <span class="mono chico suave">para revisar con atención</span>
+          <span class="kpi-num" id="kpi-revision">0</span>
+          <span class="chico suave" id="kpi-foco-tema">esperando primeras entregas</span>
+        </div>
+      </section>
+
+      <section aria-label="Lista de estudiantes">
+        <div class="lista-alumnos" id="p-lista"></div>
+      </section>
+
+      <section id="p-detalle" class="visor-alumno oculto" aria-live="polite">
+        <article class="doc tarjeta" aria-label="Trabajo marcado del estudiante">
+          <div class="fila entre" style="margin-bottom:6px">
+            <p class="mono chico suave" id="p-doc-meta">trabajo del estudiante</p>
+            <span class="chip" id="p-det-nivel"></span>
+          </div>
+          <h2 id="p-doc-titulo"></h2>
+          <div class="leyenda mono chico"><span class="ley verde">explicado</span><span class="ley amarillo">a medias</span><span class="ley rojo">no explicado</span><span class="ley neutro">no se tocó</span></div>
+          <div id="p-doc-cuerpo"></div>
+        </article>
+        <aside class="visor-lado r-lado">
+          <section class="tarjeta oculto" id="p-det-senales"></section>
+          <section class="tarjeta" id="p-det-puntos"></section>
+        </aside>
+      </section>
+    </div>
+  </main>
+</section>
+<script defer src="js/profesor.js"></script>
+
 <div id="marca-agua" aria-hidden="true"></div>
 <div id="velo" aria-hidden="true">Vuelve a esta ventana para seguir con Carlos.</div>
 
 <script src="app.js"></script>
+<script src="js/subir.js"></script>
 </body>
 </html>
