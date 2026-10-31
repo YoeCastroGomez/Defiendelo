@@ -2,25 +2,28 @@
 import { randomBytes } from 'node:crypto';
 import { archivosConfigurado, crearEnlaceSubida, crearEnlaceDescarga } from '../../compartido/archivos.js';
 import { listar } from '../../compartido/almacen.js';
+import { errorHttp } from '../../compartido/http.js';
 import { cargarCaso } from '../casos/casos.js';
 import { archivosDeInstrucciones, obtenerTareaInterna, verificarTokenProfesor } from '../tareas/tareas.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
-const CARPETAS = { enunciado: 'enunciados', resolucion: 'resoluciones' };
-
-function errorHttp(mensaje, status) {
-  const e = new Error(mensaje);
-  e.status = status;
-  return e;
-}
+// enunciado: instrucciones o teoría del profesor. base: trabajo común que sube el profesor.
+// resolucion: trabajo de un estudiante, que solo se acepta para una tarea abierta de entrega individual.
+const CARPETAS = { enunciado: 'enunciados', base: 'resoluciones', resolucion: 'resoluciones' };
 
 function exigirConfiguracion() {
   if (!archivosConfigurado()) throw errorHttp('El guardado de archivos no está disponible', 503);
 }
 
-export async function prepararSubida({ tipo, nombre, tamano } = {}) {
+export async function prepararSubida({ tipo, nombre, tamano, codigo } = {}) {
   exigirConfiguracion();
   if (!CARPETAS[tipo]) throw errorHttp('Tipo de archivo inválido', 400);
+  if (tipo === 'resolucion') {
+    const tarea = codigo ? await obtenerTareaInterna(codigo) : null;
+    if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
+    if (tarea.casoId !== 'estudiante') throw errorHttp('Esta tarea no recibe archivos de los estudiantes', 400);
+    if (tarea.cerrada) throw errorHttp('Esta tarea está cerrada: ya no recibe entregas', 403);
+  }
   const extension = /\.(pdf|docx)$/i.exec(String(nombre || ''))?.[1]?.toLowerCase();
   if (!extension) throw errorHttp('Formato no compatible. Sube un archivo .pdf o .docx', 400);
   if (!(Number(tamano) > 0) || Number(tamano) > MAX_BYTES) throw errorHttp('El archivo supera el límite de 10 MB', 400);

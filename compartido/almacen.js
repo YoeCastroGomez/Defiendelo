@@ -31,6 +31,15 @@ export async function guardar(clave, valor) {
   return 'OK';
 }
 
+// Cambia el valor de una clave que ya existe, sin renovar su vencimiento. Devuelve null si no existe.
+export async function reemplazar(clave, valor) {
+  const txt = JSON.stringify(valor);
+  if (persistente()) return redis(['SET', clave, txt, 'XX', 'KEEPTTL']);
+  if (!memoria.has(clave)) return null;
+  memoria.set(clave, txt);
+  return 'OK';
+}
+
 export async function leer(clave) {
   const txt = persistente() ? await redis(['GET', clave]) : memoria.get(clave);
   return txt ? JSON.parse(txt) : null;
@@ -47,6 +56,14 @@ export async function agregar(clave, valor) {
   arr.push(txt);
   listas.set(clave, arr);
   return arr.length;
+}
+
+// Deja solo los últimos `max` elementos de una lista (para listas que no deben crecer sin fin).
+export async function recortarLista(clave, max) {
+  if (persistente()) return redis(['LTRIM', clave, String(-max), '-1']);
+  const arr = listas.get(clave);
+  if (arr && arr.length > max) listas.set(clave, arr.slice(-max));
+  return 'OK';
 }
 
 export async function listar(clave) {

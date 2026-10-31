@@ -1,19 +1,12 @@
 // Lógica de negocio de tareas: generación de códigos sin caracteres ambiguos,
 // emisión y verificación de tokenProfesor, y soporte dual (entrega del estudiante o caso base).
-import { randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
-import { guardar, leer, persistente } from '../../compartido/almacen.js';
-import { cargarCaso } from '../defensa/turno.js';
+import { randomBytes, randomInt } from 'node:crypto';
+import { guardar, leer, reemplazar, persistente } from '../../compartido/almacen.js';
+import { errorHttp, limpio, igualSeguro } from '../../compartido/http.js';
+import { cargarCaso, esCasoPrivado } from '../casos/casos.js';
 import { limpiarArchivo } from '../../compartido/archivos.js';
 
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sin 0/O ni 1/I/L
-
-function errorHttp(mensaje, status = 400) {
-  const e = new Error(mensaje);
-  e.status = status;
-  return e;
-}
-
-const limpio = (v, max) => String(v || '').trim().slice(0, max);
 const MAX_ARCHIVOS = 5;
 const archivosEnviados = (lista) => (Array.isArray(lista) ? lista : []).map((a) => limpiarArchivo(a, 'enunciado')).filter(Boolean).slice(0, MAX_ARCHIVOS);
 
@@ -35,7 +28,8 @@ function tareaDemo() {
     criterios: 'Por qué se eligió Observer, cómo reduce el acoplamiento, en qué se diferencia de Strategy y cómo se extiende el diseño.',
     cierre: '',
     casoId: 'demo',
-    tokenProfesor: process.env.DEMO_TOKEN_PROFESOR || 'demo-profe-2026',
+    // Sin DEMO_TOKEN_PROFESOR no hay token: los reportes de la demo quedan cerrados.
+    tokenProfesor: process.env.DEMO_TOKEN_PROFESOR || '',
     creada: '2026-10-30T00:00:00.000Z',
   };
 }
@@ -58,10 +52,16 @@ export async function crearTarea(datos = {}) {
   const casoId = limpio(datos.casoId, 64) || 'demo';
   if (casoId !== 'estudiante') {
     if (!/^[a-z0-9-]{1,64}$/.test(casoId)) throw errorHttp('Identificador de caso inválido', 400);
+    let caso;
     try {
-      await cargarCaso(casoId);
+      caso = await cargarCaso(casoId);
     } catch {
       throw errorHttp('El caso base seleccionado no existe', 404);
+    }
+    // Un trabajo subido solo lo puede usar como base quien lo subió: si no, bastaría conocer su id
+    // para crear una tarea con él y leerlo.
+    if (esCasoPrivado(caso) && !igualSeguro(caso.llave, String(datos.llaveCaso || ''))) {
+      throw errorHttp('No tienes permiso para usar ese trabajo como base', 403);
     }
   }
 
@@ -80,6 +80,7 @@ export async function crearTarea(datos = {}) {
     enunciadoArchivos: archivosEnviados(datos.enunciadoArchivos),
     cierre: limpio(datos.cierre, 40),
     casoId,
+    cerrada: false,
     tokenProfesor,
     creada: new Date().toISOString(),
   };
@@ -112,9 +113,19 @@ export async function obtenerTareaPublica(codigoRaw) {
 }
 
 export function verificarTokenProfesor(tarea, tokenRecibido) {
-  if (!tarea || !tarea.tokenProfesor || typeof tokenRecibido !== 'string') return false;
-  const esperado = Buffer.from(String(tarea.tokenProfesor), 'utf8');
-  const recibido = Buffer.from(tokenRecibido.trim(), 'utf8');
-  if (!esperado.length || esperado.length !== recibido.length) return false;
-  return timingSafeEqual(esperado, recibido);
+  if (!tarea || !tarea.tokenProfesor) return false;
+  return igualSeguro(String(tarea.tokenProfesor), tokenRecibido);
+}
+
+// El profesor cierra o reabre su tarea. Cerrada, no admite entregas nuevas; ensayar sigue permitido.
+export async function cambiarEstadoTarea(codigoRaw, token, { cerrada } = {}) {
+  if (typeof cerrada !== 'boolean') throw errorHttp('Indica si la tarea queda cerrada (true o false)', 400);
+  const tarea = await obtenerTareaInterna(codigoRaw);
+  if (!tarea) throw errorHttp('No existe una tarea con ese código', 404);
+  if (tarea.codigo === 'DEMO-01') throw errorHttp('La tarea de demostración no se puede cerrar', 400);
+  if (!verificarTokenProfesor(tarea, token)) throw errorHttp('Token de profesor inválido o ausente', 401);
+  tarea.cerrada = cerrada;
+  tarea.cerradaEn = cerrada ? new Date().toISOString() : null;
+  if (!(await reemplazar('tarea:' + tarea.codigo, tarea))) throw errorHttp('La tarea ya no existe', 404);
+  return { codigo: tarea.codigo, cerrada: tarea.cerrada, cerradaEn: tarea.cerradaEn };
 }

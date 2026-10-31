@@ -3,6 +3,8 @@
 //   LLM_API_KEY  = clave del proveedor
 //   LLM_MODEL    = nombre del modelo (obligatorio, cambia con el tiempo)
 //   LLM_BASE_URL = solo para openai-compatible (p. ej. un servidor local)
+//   LLM_MODEL_RESPALDO = solo para gemini: modelo a usar si LLM_MODEL ya no existe (404).
+//                        Por defecto, el alias `gemini-flash-lite-latest`, que Google mantiene vigente.
 const P = () => (process.env.LLM_PROVIDER || '').toLowerCase();
 
 export function proveedorConfigurado() {
@@ -17,7 +19,11 @@ async function post(url, headers, body) {
     signal: AbortSignal.timeout(25000),
   });
   const txt = await r.text();
-  if (!r.ok) throw new Error(`Proveedor ${P()} respondió ${r.status}: ${txt.slice(0, 200)}`);
+  if (!r.ok) {
+    const e = new Error(`Proveedor ${P()} respondió ${r.status}: ${txt.slice(0, 200)}`);
+    e.status404 = r.status === 404;
+    throw e;
+  }
   return JSON.parse(txt);
 }
 
@@ -35,34 +41,29 @@ export async function llamarLLM(sistema, mensajes, opciones = {}) {
   }
 
   if (p === 'gemini') {
-    const modelo = (model || 'gemini-2.5-flash').trim().replace(/^models\//, '');
-    const genConfig = {
-      temperature: 0.3,
-      maxOutputTokens: maxTokens,
-      responseMimeType: 'application/json',
+    const limpiar = (m) => String(m || '').trim().replace(/^models\//, '');
+    const modelo = limpiar(model);
+    const respaldo = limpiar(process.env.LLM_MODEL_RESPALDO) || 'gemini-flash-lite-latest';
+    const cuerpoPara = (m) => {
+      const generationConfig = { temperature: 0.3, maxOutputTokens: maxTokens, responseMimeType: 'application/json' };
+      // Los modelos 2.5 piensan antes de responder: se desactiva para no superar el tiempo límite.
+      if (m.includes('2.5')) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      return {
+        systemInstruction: { parts: [{ text: sistema }] },
+        contents: mensajes.map((x) => ({ role: x.role === 'assistant' ? 'model' : 'user', parts: [{ text: x.content }] })),
+        generationConfig,
+      };
     };
-    if (modelo.includes('2.5')) {
-      genConfig.thinkingConfig = { thinkingBudget: 0 };
-    }
-    const cuerpoGemini = {
-      systemInstruction: { parts: [{ text: sistema }] },
-      contents: mensajes.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-      generationConfig: genConfig,
-    };
+    const pedir = (m) => post(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`,
+      { 'x-goog-api-key': key }, cuerpoPara(m));
     let d;
     try {
-      d = await post(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelo)}:generateContent`,
-        { 'x-goog-api-key': key },
-        cuerpoGemini);
+      d = await pedir(modelo);
     } catch (err) {
-      if (err.message && err.message.includes('404') && modelo !== 'gemini-1.5-flash') {
-        const genConfig15 = { temperature: 0.3, maxOutputTokens: maxTokens, responseMimeType: 'application/json' };
-        d = await post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-          { 'x-goog-api-key': key },
-          { ...cuerpoGemini, generationConfig: genConfig15 });
-      } else {
-        throw err;
-      }
+      // Un 404 significa que el modelo se retiró o el nombre está mal: se prueba una sola vez con el respaldo.
+      if (!err.status404 || respaldo === modelo) throw err;
+      console.error(`[llm] el modelo ${modelo} no existe; se usa ${respaldo}`);
+      d = await pedir(respaldo);
     }
     const cand = d?.candidates?.[0];
     if (!cand?.content?.parts) {

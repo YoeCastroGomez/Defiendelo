@@ -66,7 +66,9 @@
   async function extraerPDF(archivo) {
     await cargarScript(CDN_PDF + 'pdf.min.js');
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = CDN_PDF + 'pdf.worker.min.js';
-    const pdf = await window.pdfjsLib.getDocument({ data: await archivo.arrayBuffer() }).promise;
+    // isEvalSupported: false es la mitigación oficial de CVE-2024-4367 (ejecución de código con fuentes
+    // de un PDF malicioso) para esta versión de PDF.js. Aquí solo se extrae texto, pero no cuesta nada.
+    const pdf = await window.pdfjsLib.getDocument({ data: await archivo.arrayBuffer(), isEvalSupported: false }).promise;
     const paginas = [];
     for (let n = 1; n <= pdf.numPages; n++) {
       const contenido = await (await pdf.getPage(n)).getTextContent();
@@ -210,13 +212,13 @@
   }
 
   // Guardar el original es un extra: si falla, la defensa sigue con el texto ya extraído.
-  async function guardarOriginal(archivo, tipo) {
+  async function guardarOriginal(archivo, tipo, codigo) {
     if (!archivo) return null;
     try {
       const r = await fetch('api/archivos', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ tipo, nombre: archivo.name, tamano: archivo.size }),
+        body: JSON.stringify({ tipo, nombre: archivo.name, tamano: archivo.size, codigo }),
       });
       if (!r.ok) throw new Error('sin enlace de subida');
       const d = await r.json();
@@ -287,23 +289,26 @@
       etiqueta: 'Sube tu resolución',
       async procesar(texto, titulo, avisar, archivo) {
         avisar('Guardando tu archivo…');
-        const original = await guardarOriginal(archivo, 'resolucion');
+        const original = await guardarOriginal(archivo, 'resolucion', S.tarea.codigo);
         avisar('2/2 Carlos está revisando tu trabajo para preparar sus dudas…');
         const t = S.tarea;
         const envio = { archivo: original, codigo: t.codigo, titulo: titulo || t.titulo, curso: t.curso, tarea: t.titulo, criterios: t.criterios, estudiante: $('nombre').value.trim(), texto };
         const d = await crearDocumento(envio);
-        const r = await fetch('api/casos?id=' + encodeURIComponent(d.casoId));
+        // El trabajo es privado: solo se vuelve a abrir con la llave que devolvió el servidor.
+        const r = await fetch('api/casos?id=' + encodeURIComponent(d.casoId), { headers: { 'x-llave-caso': d.llave } });
         if (!r.ok) throw new Error('Tu trabajo se procesó, pero no se pudo cargar. Intenta de nuevo.');
         S.caso = await r.json();
         S.casoId = d.casoId;
+        S.llave = d.llave;
         S.casoUsado = false;
         // Quien ya ensayó no llega a la entrega con las mismas dudas: se generan otras sobre el mismo trabajo.
         window.renovarCasoEntrega = async () => {
-          const nuevo = await crearDocumento({ ...envio, estudiante: S.nombre, evitar: S.caso.puntos.map((p) => p.apertura) });
-          const rc = await fetch('api/casos?id=' + encodeURIComponent(nuevo.casoId));
+          const nuevo = await crearDocumento({ ...envio, estudiante: S.nombre, casoAnterior: S.casoId, llaveAnterior: S.llave });
+          const rc = await fetch('api/casos?id=' + encodeURIComponent(nuevo.casoId), { headers: { 'x-llave-caso': nuevo.llave } });
           if (!rc.ok) throw new Error('Carlos no pudo preparar las dudas nuevas. Intenta de nuevo.');
           S.caso = await rc.json();
           S.casoId = nuevo.casoId;
+          S.llave = nuevo.llave;
         };
         $('i-tarea').textContent = S.caso.documento.titulo;
         chip.textContent = 'listo';
@@ -406,11 +411,13 @@
     etiqueta: 'Sube el trabajo común',
     async procesar(texto, titulo, avisar, archivo) {
       avisar('Guardando tu archivo…');
-      const original = await guardarOriginal(archivo, 'resolucion');
+      const original = await guardarOriginal(archivo, 'base');
       avisar('2/2 Preparando las dudas de Carlos…');
       const tituloBase = titulo || $('t-titulo').value;
       const d = await crearDocumento({ archivo: original, titulo: tituloBase, curso: $('t-curso').value, tarea: $('t-titulo').value, criterios: $('t-crit').value, texto });
-      selector.querySelector('option[value="subir"]').before(nuevaOpcion(d.casoId, 'Trabajo subido: ' + d.titulo));
+      const opcion = nuevaOpcion(d.casoId, 'Trabajo subido: ' + d.titulo);
+      opcion.dataset.llave = d.llave; // la tarea solo puede usar este trabajo si presenta su llave
+      selector.querySelector('option[value="subir"]').before(opcion);
       selector.value = d.casoId;
       actualizarOrigen();
     },

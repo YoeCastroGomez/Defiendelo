@@ -3,7 +3,7 @@
 const $ = (id) => document.getElementById(id);
 
 const S = {
-  caso: null, modo: 'practica', iaOK: false, forzarSim: false,
+  caso: null, modo: 'practica', iaOK: false, forzarSim: false, intento: null, llave: null,
   i: 0, hist: [], repregunto: false, resultados: {}, t0: 0,
   senales: { pantallaOculta: 0, pegadoBloqueado: 0, leyo: 0, dubitativo: 0, captura: 0, iaCaida: false },
 };
@@ -15,18 +15,11 @@ function mostrar(id) {
   document.body.classList.remove('velado');
   window.scrollTo(0, 0);
 }
-function norm(t) {
-  return t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ\s]/g, ' ').split(/\s+/).filter(Boolean);
-}
-// Qué fracción de los trigramas de la respuesta aparecen tal cual en el texto del trabajo.
-function contencion(resp, texto) {
-  const a = norm(resp), b = norm(texto);
-  if (a.length < 8) return 0;
-  const tri = (w) => new Set(w.slice(0, -2).map((_, i) => w.slice(i, i + 3).join(' ')));
-  const A = tri(a), B = tri(b);
-  let c = 0; A.forEach((x) => { if (B.has(x)) c++; });
-  return A.size ? c / A.size : 0;
-}
+// Lectura literal y muletillas: js/senales.js, el mismo código con el que el servidor las recalcula.
+const { leyoTrabajo, esDubitativo } = window.Senales;
+// Pide un caso con lo que demuestra que se puede abrir: la llave de quien lo subió o el código de la tarea.
+const urlCaso = (id) => 'api/casos?id=' + encodeURIComponent(id) + (S.tarea ? '&codigo=' + encodeURIComponent(S.tarea.codigo) : '');
+const pedirCaso = (id, llave) => fetch(urlCaso(id), { headers: llave ? { 'x-llave-caso': llave } : {} });
 const frag = (id) => S.caso.documento.fragmentos.find((f) => f.id === id);
 const punto = () => S.caso.puntos[S.i];
 function tipoPunto(p) {
@@ -35,11 +28,6 @@ function tipoPunto(p) {
   if (/condici[oó]n|mañana|nuevo canal|cambio/i.test(p.tema || '') || /si mañana/i.test(p.apertura || '')) return 'condicion';
   if (p.error_de_carlos) return 'trampa';
   return 'decision';
-}
-function esDubitativo(texto) {
-  const limpio = (texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const m = limpio.match(/\b(creo que|me parece|tal vez|quizas|quiza|no estoy segur[oa]|supongo|a lo mejor|no se bien|diria que)\b/g);
-  return (m ? m.length : 0) >= 1;
 }
 const HUMOR_TXT = {
   curioso: 'compañero curioso',
@@ -193,11 +181,12 @@ async function entrarConCodigo(e) {
     if (!r.ok) throw new Error(t.error || 'No se pudo cargar la tarea');
     S.tarea = t;
     S.casoUsado = false;
+    S.llave = null;
     S.casoId = t.casoId || 'demo';
     if (S.casoId === 'estudiante') {
       S.caso = null;
     } else {
-      const rc = await fetch('api/casos?id=' + encodeURIComponent(S.casoId));
+      const rc = await pedirCaso(S.casoId);
       if (!rc.ok) throw new Error('No se pudo cargar el trabajo');
       S.caso = await rc.json();
     }
@@ -217,6 +206,12 @@ async function entrarConCodigo(e) {
   $('i-codigo').textContent = t.codigo;
   $('i-tarea').textContent = S.caso ? S.caso.documento.titulo : 'Aún no subes tu resolución';
   $('i-prov').textContent = S.caso?.provisional ? 'caso de ejemplo provisional' : '';
+  // Una tarea cerrada ya no recibe entregas, pero se puede seguir ensayando.
+  const entregar = document.querySelector('input[name=modo][value=evaluacion]');
+  entregar.disabled = !!t.cerrada;
+  if (t.cerrada) document.querySelector('input[name=modo][value=practica]').checked = true;
+  $('op-entregar').classList.toggle('deshabilitada', !!t.cerrada);
+  $('op-entregar-txt').textContent = t.cerrada ? 'El profesor cerró esta tarea: ya no recibe entregas. Todavía puedes ensayar.' : 'Tu profesor recibe el reporte. Tienes un solo intento: si sales a mitad, se entrega lo que llevas. Carlos trae dudas nuevas.';
   window.dispatchEvent(new CustomEvent('defiendelo:inicio', { detail: t }));
   mostrar('inicio');
 }
@@ -238,7 +233,7 @@ async function crearTarea(e) {
   try {
     const r = await fetch('api/tareas', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ titulo: $('t-titulo').value, curso: $('t-curso').value, profesor: $('t-prof').value, criterios: $('t-crit').value, cierre: $('t-cierre').value, casoId: $('t-caso').value, ...(window.enunciadoTarea ? window.enunciadoTarea() : {}) }),
+      body: JSON.stringify({ titulo: $('t-titulo').value, curso: $('t-curso').value, profesor: $('t-prof').value, criterios: $('t-crit').value, cierre: $('t-cierre').value, casoId: $('t-caso').value, llaveCaso: $('t-caso').selectedOptions[0]?.dataset.llave || '', ...(window.enunciadoTarea ? window.enunciadoTarea() : {}) }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'No se pudo crear la tarea');
@@ -258,14 +253,16 @@ async function copiar(texto, boton) {
   setTimeout(() => { boton.textContent = antes; }, 1600);
 }
 
-// Avisa antes de empezar: el servidor rechaza igual la segunda entrega, pero sin hacer perder la defensa.
-async function yaEntrego() {
-  try {
-    const r = await fetch('api/sesiones?codigo=' + encodeURIComponent(S.tarea.codigo) + '&nombre=' + encodeURIComponent(S.nombre));
-    return r.ok && (await r.json()).entregada;
-  } catch {
-    return false;
-  }
+// Abre la entrega en el servidor. Ahí quedan registradas las evaluaciones de Carlos, y con ellas se
+// arma el reporte. El servidor rechaza aquí una segunda entrega o una tarea cerrada.
+async function abrirIntento() {
+  const r = await fetch('api/intentos', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ codigo: S.tarea.codigo, nombre: S.nombre, casoId: S.casoId, llave: S.llave }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'No se pudo empezar la entrega. Intenta de nuevo.');
+  return d.intento;
 }
 
 async function empezar() {
@@ -274,16 +271,17 @@ async function empezar() {
   if (!S.nombre) { $('nombre-err').textContent = 'Escribe tu nombre para que tu profesor reconozca tu defensa.'; $('nombre').focus(); return; }
   $('nombre-err').textContent = '';
   S.modo = document.querySelector('input[name=modo]:checked').value;
+  S.intento = null;
   if (S.modo === 'evaluacion') {
     const boton = $('b-empezar');
     const textoBoton = boton.textContent;
     boton.disabled = true;
     try {
-      if (await yaEntrego()) { $('nombre-err').textContent = 'Ya entregaste esta tarea con ese nombre. Solo se permite un intento; puedes seguir ensayando.'; return; }
       if (S.casoUsado && window.renovarCasoEntrega) {
         boton.textContent = 'Carlos prepara dudas nuevas…';
         await window.renovarCasoEntrega();
       }
+      S.intento = await abrirIntento();
     } catch (err) {
       $('nombre-err').textContent = err.message;
       return;
@@ -299,7 +297,8 @@ async function empezar() {
   $('marca-agua').textContent = `${S.nombre} · ${S.tarea.codigo}   `.repeat(120);
   $('d-modo').textContent = S.modo === 'practica' ? 'ensayo' : 'entrega';
   $('d-titulo').textContent = S.caso.documento.titulo;
-  $('b-sim').classList.toggle('oculto', S.iaOK && !S.forzarSim);
+  S.forzarSim = false;
+  $('b-sim').classList.toggle('oculto', S.iaOK);
   aplicarModoRespuesta();
   actualizarTermometro(null, false);
   mostrar('defensa');
@@ -374,32 +373,47 @@ async function responder(texto) {
   texto = (texto || '').trim();
   detenerMic();
   const p = punto();
-  const leyo = contencion(texto, frag(p.fragmento).texto) >= 0.6;
-  const dubitativo = esDubitativo(texto);
-  if (leyo) S.senales.leyo++;
-  if (dubitativo) S.senales.dubitativo++;
+  let leyo = leyoTrabajo(texto, frag(p.fragmento).texto);
+  let dubitativo = esDubitativo(texto);
   S.hist.push({ rol: 'estudiante', texto: texto || '(silencio)' });
   modoRespuesta(false); $('b-sig').classList.add('oculto');
   fijarAvatar('pensando');
   $('d-dice').classList.add('pensando'); $('d-dice').textContent = 'Carlos está pensando…';
 
+  // El servidor evalúa siempre, incluso sin IA (modo simulado). En una entrega, además registra el
+  // resultado: el reporte del profesor sale de ese registro. Solo si no hay conexión se evalúa aquí.
   let r;
-  if (S.iaOK && !S.forzarSim) {
-    try {
-      const res = await fetch('api/carlos', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ casoId: S.casoId, puntoId: p.id, historial: S.hist, yaRepregunto: S.repregunto, leyo, dubitativo }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error);
-      r = await res.json();
-    } catch (e) {
+  try {
+    const res = await fetch('api/carlos', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ casoId: S.casoId, puntoId: p.id, historial: S.hist, yaRepregunto: S.repregunto, intento: S.intento, llave: S.llave, codigo: S.tarea.codigo }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(d.error || 'Carlos no respondió'), { status: res.status });
+    r = d;
+    leyo = !!r.leyo; dubitativo = !!r.dubitativo;
+    if (r.iaCaida && !S.forzarSim) {
       S.senales.iaCaida = true; S.forzarSim = true;
+      $('b-sim').classList.remove('oculto');
       $('d-aviso').textContent = 'La IA no respondió; seguimos en modo simulado.';
-      r = simulado(p, texto, leyo, dubitativo);
     }
-  } else {
+  } catch (e) {
+    // Un 4xx es una respuesta del servidor (sin acceso, intento vencido, demasiadas peticiones):
+    // se muestra y se deja reintentar, sin evaluar por nuestra cuenta.
+    if (e.status && e.status < 500) {
+      S.hist.pop();
+      $('d-aviso').textContent = e.message;
+      modoRespuesta(true);
+      decir(S.hist[S.hist.length - 1].texto);
+      return;
+    }
+    $('d-aviso').textContent = S.modo === 'evaluacion'
+      ? 'Sin conexión con el servidor: este punto no quedará registrado en tu entrega.'
+      : (e.message || 'Carlos no respondió; seguimos en modo simulado.');
     r = simulado(p, texto, leyo, dubitativo);
   }
+  if (leyo) S.senales.leyo++;
+  if (dubitativo) S.senales.dubitativo++;
 
   const estadoSugerido = r.estado_carlos || (r.repreguntar ? (dubitativo || leyo ? 'ironico' : 'confundido') : r.nivel === 'verde' ? 'convencido' : r.nivel === 'rojo' ? 'ironico' : 'confundido');
   fijarAvatar(estadoSugerido);
@@ -516,13 +530,27 @@ $('b-cambiar').onclick = () => {
   aplicarModoRespuesta();
   if (S.respuesta === 'texto') $('resp').focus();
 };
-$('b-salir').onclick = () => {
-  const aviso = S.modo === 'evaluacion' ? '¿Salir de la entrega? Tu avance se pierde y el profesor no recibirá ningún reporte.' : '¿Salir del ensayo? Tu avance se pierde.';
+// Solo hay un intento: salir de una entrega con respuestas la entrega con lo que se respondió.
+const entregaEnCurso = () => S.modo === 'evaluacion' && S.intento && $('defensa').classList.contains('on') && Object.keys(S.resultados).length > 0;
+$('b-salir').onclick = async () => {
+  const aviso = S.modo !== 'evaluacion' ? '¿Salir del ensayo? Tu avance se pierde.'
+    : Object.keys(S.resultados).length ? '¿Salir de la entrega? Solo tienes un intento: tu profesor recibirá lo que llevas respondido y no podrás volver a empezar.'
+      : '¿Salir de la entrega? Aún no respondiste nada, así que podrás empezarla de nuevo.';
   if (!window.confirm(aviso)) return;
   detenerMic();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (entregaEnCurso()) {
+    try {
+      await fetch('api/sesiones', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ modo: 'evaluacion', intento: S.intento, abandonada: true, senales: { pantallaOculta: S.senales.pantallaOculta, pegadoBloqueado: S.senales.pegadoBloqueado, captura: S.senales.captura } }),
+      });
+    } catch { /* si no se pudo enviar, el servidor la cierra sola al rato o al volver a empezar */ }
+  }
   mostrar('inicio');
 };
+// Cerrar la pestaña a mitad de una entrega también gasta el intento: se avisa antes.
+window.addEventListener('beforeunload', (e) => { if (entregaEnCurso()) { e.preventDefault(); e.returnValue = ''; } });
 if (!SR) {
   document.querySelector('input[name=respuesta][value=voz]').disabled = true;
   document.querySelector('input[name=respuesta][value=texto]').checked = true;

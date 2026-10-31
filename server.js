@@ -26,9 +26,16 @@ async function cargarApi(nombre) {
 
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const PUERTO = process.env.PORT || 3000;
-const MAX_BODY_BYTES = 1024 * 1024; // 1 MB para peticiones JSON (el texto extraído de PDF/DOCX llega como JSON)
+// Igual que el límite de Vercel para el cuerpo de una función (4,5 MB): en local y desplegado se acepta lo mismo.
+const MAX_BODY_BYTES = 4.5 * 1024 * 1024;
 
-http.createServer(async (req, res) => {
+// Un error inesperado responde 500 en vez de tumbar el proceso.
+http.createServer((req, res) => atender(req, res).catch((e) => {
+  console.error('[server]', e);
+  if (!res.headersSent) { res.statusCode = 500; res.end('Error interno'); } else res.end();
+})).listen(PUERTO, () => console.log(`Defiéndelo en http://localhost:${PUERTO}`));
+
+async function atender(req, res) {
   const url = new URL(req.url, 'http://x');
   const api = url.pathname.match(/^\/api\/([a-z0-9_-]+)$/);
   if (api) {
@@ -53,7 +60,12 @@ http.createServer(async (req, res) => {
     try { body = raw ? JSON.parse(raw) : {}; } catch { return r.status(400).json({ error: 'JSON inválido' }); }
     return handler({ method: req.method, headers: req.headers, socket: req.socket, body, query: Object.fromEntries(url.searchParams) }, r);
   }
-  const rel = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+  let rel;
+  try {
+    rel = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+  } catch {
+    res.statusCode = 400; return res.end('Dirección inválida'); // p. ej. /%E0%A4%A
+  }
   const archivo = path.join(RAIZ, 'public', path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));
   if (!archivo.startsWith(path.join(RAIZ, 'public'))) { res.statusCode = 403; return res.end(); }
   try {
@@ -63,4 +75,4 @@ http.createServer(async (req, res) => {
   } catch {
     res.statusCode = 404; res.end('No encontrado');
   }
-}).listen(PUERTO, () => console.log(`Defiéndelo en http://localhost:${PUERTO}`));
+}

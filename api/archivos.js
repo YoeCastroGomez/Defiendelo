@@ -2,34 +2,20 @@
 // GET  /api/archivos?codigo=X&indice=N&tipo=teoria → enlace temporal para bajar instrucciones o teoría
 // GET  /api/archivos?codigo=X&casoId=Y   → enlace temporal para bajar una entrega (con x-token-profesor)
 import { prepararSubida, enlaceMaterial, enlaceEntrega } from '../modulos/archivos/archivos.js';
-import * as almacen from '../compartido/almacen.js';
+import { superaLimite, cabecera, cuerpo } from '../compartido/http.js';
 
-const MAX_POR_MINUTO = 20;
-const ERRORES_PROPIOS = [400, 401, 404, 503];
-
-// Si el contador falla, se deja pasar: la subida es opcional y no debe cortar una entrega.
-async function superaLimite(req) {
-  const ip = (req.headers?.['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || 'local';
-  try {
-    return await almacen.incrementar('limite:archivos:' + ip, 60) > MAX_POR_MINUTO;
-  } catch (e) {
-    console.error('[api/archivos]', e.message);
-    return false;
-  }
-}
+const ERRORES_PROPIOS = [400, 401, 403, 404, 503];
 
 export default async function handler(req, res) {
   try {
     if (req.method === 'POST') {
-      if (await superaLimite(req)) return res.status(429).json({ error: 'Demasiadas subidas seguidas. Espera un minuto.' });
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-      return res.status(201).json(await prepararSubida(body));
+      if (await superaLimite(req, 'archivos')) return res.status(429).json({ error: 'Demasiadas subidas seguidas. Espera un minuto.' });
+      return res.status(201).json(await prepararSubida(cuerpo(req)));
     }
     if (req.method === 'GET') {
       const { codigo, casoId, indice, tipo } = req.query || {};
       if (!casoId) return res.status(200).json(await enlaceMaterial(codigo, indice, tipo));
-      const h = req.headers?.['x-token-profesor'];
-      return res.status(200).json(await enlaceEntrega(codigo, String(casoId), Array.isArray(h) ? h[0] : String(h || '')));
+      return res.status(200).json(await enlaceEntrega(codigo, String(casoId), cabecera(req, 'x-token-profesor')));
     }
     return res.status(405).json({ error: 'método no permitido' });
   } catch (e) {
