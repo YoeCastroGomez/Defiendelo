@@ -33,7 +33,7 @@ const MAX_BODY_BYTES = 4.5 * 1024 * 1024;
 http.createServer((req, res) => atender(req, res).catch((e) => {
   console.error('[server]', e);
   if (!res.headersSent) { res.statusCode = 500; res.end('Error interno'); } else res.end();
-})).listen(PUERTO, () => console.log(`Defiéndelo en http://localhost:${PUERTO}`));
+})).listen(PUERTO, () => console.log(`Defiendelo en http://localhost:${PUERTO}`));
 
 async function atender(req, res) {
   const url = new URL(req.url, 'http://x');
