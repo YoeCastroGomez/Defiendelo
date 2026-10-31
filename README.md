@@ -5,7 +5,7 @@
 Proyecto para **DSC HACK 2026** · Reto *Educación 2036* · Grieta 02 *“Aprender sin pensar”*.
 
 **Demo:** https://defiendelo-six.vercel.app · código de prueba: `DEMO-01`
-**Pitch:** *[Pendiente: pegar aquí el enlace a las diapositivas]*
+**Pitch:**https://canva.link/qw88nukvephvhf1**
 
 ---
 
@@ -19,8 +19,6 @@ Con la IA generativa, un estudiante puede entregar un trabajo impecable sin ente
 - **Una defensa oral manual** sí funciona, pero no escala: a unos 15 minutos por alumno, una clase de 40 son 10 horas por tarea.
 
 ### Aprendizajes con usuarios reales
-*[Pendiente: completar con las entrevistas reales. No se publican datos hasta tenerlos.]*
-
 Probamos Defiéndelo con **1 estudiante** de **Ingeniería de telecomunicaciones**.
 
 ### La solución
