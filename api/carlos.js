@@ -1,6 +1,6 @@
 // Función serverless (Vercel): POST /api/carlos
-import { evaluarTurno } from '../lib/turno.js';
-import { proveedorConfigurado } from '../lib/llm.js';
+import { evaluarTurno } from '../modulos/defensa/turno.js';
+import { proveedorConfigurado } from '../compartido/llm.js';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') return res.status(200).json({ ia: proveedorConfigurado() });

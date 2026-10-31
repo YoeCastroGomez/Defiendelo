@@ -111,7 +111,13 @@ async function entrarConCodigo(e) {
     if (!r.ok) throw new Error(t.error || 'No se pudo cargar la tarea');
     S.tarea = t;
     S.casoId = t.casoId || 'demo';
-    S.caso = await (await fetch(`casos/${S.casoId}.json`)).json();
+    if (S.casoId === 'estudiante') {
+      S.caso = null;
+    } else {
+      const rc = await fetch(`casos/${S.casoId}.json`);
+      if (!rc.ok) throw new Error('No se pudo cargar el trabajo');
+      S.caso = await rc.json();
+    }
   } catch (err) {
     $('codigo-err').textContent = err.message; mostrar('rol'); return;
   }
@@ -121,8 +127,9 @@ async function entrarConCodigo(e) {
   $('i-crit').textContent = t.criterios || '';
   $('i-crit-caja').classList.toggle('oculto', !t.criterios);
   $('i-codigo').textContent = t.codigo;
-  $('i-tarea').textContent = S.caso.documento.titulo;
-  $('i-prov').textContent = S.caso.provisional ? 'caso de ejemplo provisional' : '';
+  $('i-tarea').textContent = S.caso ? S.caso.documento.titulo : 'Pendiente: sube tu archivo (.pdf o .docx)';
+  $('i-prov').textContent = S.caso?.provisional ? 'caso de ejemplo provisional' : '';
+  window.dispatchEvent(new CustomEvent('defiendelo:inicio', { detail: t }));
   mostrar('inicio');
 }
 
@@ -163,6 +170,7 @@ async function copiar(texto, boton) {
 }
 
 function empezar() {
+  if (!S.caso) { $('nombre-err').textContent = 'Primero sube y procesa tu trabajo (.pdf o .docx).'; return; }
   S.nombre = $('nombre').value.trim();
   if (!S.nombre) { $('nombre-err').textContent = 'Escribe tu nombre para que tu profesor reconozca tu defensa.'; $('nombre').focus(); return; }
   $('nombre-err').textContent = '';

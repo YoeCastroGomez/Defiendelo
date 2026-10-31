@@ -3,12 +3,15 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { llamarLLM, proveedorConfigurado } from './llm.js';
+import { llamarLLM, proveedorConfigurado } from '../../compartido/llm.js';
+import { leer } from '../../compartido/almacen.js';
 
-const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 export async function cargarCaso(id) {
   if (!/^[a-z0-9-]{1,64}$/.test(id || '')) throw new Error('caso inválido');
+  const guardado = await leer('caso:' + id);
+  if (guardado) return guardado;
   const txt = await readFile(path.join(RAIZ, 'public', 'casos', `${id}.json`), 'utf8');
   return JSON.parse(txt);
 }

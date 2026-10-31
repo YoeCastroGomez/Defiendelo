@@ -21,15 +21,16 @@ async function post(url, headers, body) {
   return JSON.parse(txt);
 }
 
-export async function llamarLLM(sistema, mensajes) {
+export async function llamarLLM(sistema, mensajes, opciones = {}) {
   const key = process.env.LLM_API_KEY;
   const model = process.env.LLM_MODEL;
+  const maxTokens = opciones.maxTokens || 1500;
   const p = P();
 
   if (p === 'anthropic') {
     const d = await post('https://api.anthropic.com/v1/messages',
       { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      { model, max_tokens: 400, temperature: 0.4, system: sistema, messages: mensajes });
+      { model, max_tokens: maxTokens, temperature: 0.4, system: sistema, messages: mensajes });
     return d.content.map((c) => c.text || '').join('');
   }
 
@@ -39,7 +40,7 @@ export async function llamarLLM(sistema, mensajes) {
       {
         systemInstruction: { parts: [{ text: sistema }] },
         contents: mensajes.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-        generationConfig: { temperature: 0.4, maxOutputTokens: 400, responseMimeType: 'application/json' },
+        generationConfig: { temperature: 0.4, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
       });
     return d.candidates[0].content.parts.map((x) => x.text || '').join('');
   }
@@ -53,7 +54,7 @@ export async function llamarLLM(sistema, mensajes) {
   const d = await post(`${bases[p].replace(/\/$/, '')}/chat/completions`,
     { authorization: `Bearer ${key}` },
     {
-      model, temperature: 0.4, max_tokens: 400,
+      model, temperature: 0.4, max_tokens: maxTokens,
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: sistema }, ...mensajes],
     });

@@ -1,10 +1,10 @@
-// Servidor local sin dependencias: sirve /public y /api/carlos.
+// Servidor local sin dependencias: sirve /public y /api/<nombre>.
 // Uso: node server.js  (lee variables de .env si existe)
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const RAIZ = path.dirname(fileURLToPath(import.meta.url));
 if (existsSync(path.join(RAIZ, '.env'))) {
@@ -13,28 +13,45 @@ if (existsSync(path.join(RAIZ, '.env'))) {
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
   }
 }
-const API = {
-  carlos: (await import('./api/carlos.js')).default,
-  tareas: (await import('./api/tareas.js')).default,
-};
+
+const API_CACHE = new Map();
+async function cargarApi(nombre) {
+  if (API_CACHE.has(nombre)) return API_CACHE.get(nombre);
+  const ruta = path.join(RAIZ, 'api', `${nombre}.js`);
+  if (!existsSync(ruta)) return null;
+  const mod = (await import(pathToFileURL(ruta).href)).default;
+  API_CACHE.set(nombre, mod);
+  return mod;
+}
 
 const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const PUERTO = process.env.PORT || 3000;
+const MAX_BODY_BYTES = 1024 * 1024; // 1 MB para peticiones JSON (el texto extraído de PDF/DOCX llega como JSON)
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
-  const api = url.pathname.match(/^\/api\/([a-z]+)$/);
+  const api = url.pathname.match(/^\/api\/([a-z0-9_-]+)$/);
   if (api) {
     const r = {
       status(c) { res.statusCode = c; return r; },
-      json(o) { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(o)); },
+      setHeader(k, v) { res.setHeader(k, v); return r; },
+      json(o) { res.setHeader('content-type', 'application/json; charset=utf-8'); res.end(JSON.stringify(o)); },
+      send(b) { res.end(b); },
+      end(b) { res.end(b); },
     };
-    if (!API[api[1]]) return r.status(404).json({ error: 'no existe' });
-    let raw = '';
-    for await (const c of req) raw += c;
+    const handler = await cargarApi(api[1]);
+    if (!handler) return r.status(404).json({ error: 'no existe' });
+    const chunks = [];
+    let bytes = 0;
+    for await (const c of req) {
+      bytes += c.length;
+      if (bytes > MAX_BODY_BYTES) return r.status(413).json({ error: 'Cuerpo demasiado grande' });
+      chunks.push(c);
+    }
+    const raw = Buffer.concat(chunks).toString('utf8');
     let body = {};
     try { body = raw ? JSON.parse(raw) : {}; } catch { return r.status(400).json({ error: 'JSON inválido' }); }
-    return API[api[1]]({ method: req.method, body, query: Object.fromEntries(url.searchParams) }, r);
+    return handler({ method: req.method, headers: req.headers, socket: req.socket, body, query: Object.fromEntries(url.searchParams) }, r);
   }
   const rel = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
   const archivo = path.join(RAIZ, 'public', path.normalize(rel).replace(/^(\.\.[/\\])+/, ''));

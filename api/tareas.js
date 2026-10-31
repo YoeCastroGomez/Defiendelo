@@ -1,8 +1,8 @@
 // POST /api/tareas          → el profesor crea una tarea y recibe un código
 // GET  /api/tareas?codigo=X → el estudiante carga la tarea con ese código
 import { randomInt } from 'node:crypto';
-import { guardar, leer, persistente } from '../lib/almacen.js';
-import { cargarCaso } from '../lib/turno.js';
+import { guardar, leer, persistente } from '../compartido/almacen.js';
+import { cargarCaso } from '../modulos/defensa/turno.js';
 
 const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sin 0/O ni 1/I/L para dictarlo sin confusiones
 const DEMO = { codigo: 'DEMO-01', titulo: 'Informe de diseño: módulo de notificaciones', curso: 'Diseño de Software', profesor: 'Prof. de demostración', criterios: 'Por qué se eligió Observer, cómo reduce el acoplamiento, en qué se diferencia de Strategy y cómo se extiende el diseño.', cierre: '', casoId: 'demo' };
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         creada: new Date().toISOString(),
       };
       if (!tarea.titulo || !tarea.curso) return res.status(400).json({ error: 'Faltan el título o el curso' });
-      await cargarCaso(tarea.casoId); // valida que el caso exista
+      if (tarea.casoId !== 'estudiante') await cargarCaso(tarea.casoId); // valida que el caso base exista
       for (let k = 0; k < 5; k++) {
         tarea.codigo = nuevoCodigo();
         if (await guardar('tarea:' + tarea.codigo, tarea)) {
